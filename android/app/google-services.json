@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "990218908789",
+    "firebase_url": "https://education-all-in-one-default-rtdb.firebaseio.com",
+    "project_id": "education-all-in-one",
+    "storage_bucket": "education-all-in-one.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:990218908789:android:2d3140b44774203f9af43c",
+        "android_client_info": {
+          "package_name": "com.exam.tymadmin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDL_YbwleKv_MEYFuqC4NbbXCcrsFk_KkQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:990218908789:android:2f579c49bc5d097b9af43c",
+        "android_client_info": {
+          "package_name": "com.example.atulyaras_education_02"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDL_YbwleKv_MEYFuqC4NbbXCcrsFk_KkQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:990218908789:android:e7557b737c74231d9af43c",
+        "android_client_info": {
+          "package_name": "com.example.luyip_website_edu"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDL_YbwleKv_MEYFuqC4NbbXCcrsFk_KkQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
