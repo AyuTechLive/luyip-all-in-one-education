@@ -150,7 +150,7 @@ class _AddCourseTeachersState extends State<AddCourseTeachers> {
                     ),
                     title: Text(teacher['Name'] ?? 'Unknown'),
                     subtitle: Text(
-                      teacher['Subject'] ?? 'No subject specified',
+                      teacher['Subjects'] ?? 'No subject specified',
                     ),
                     trailing:
                         isSelected

@@ -19,9 +19,17 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
   final searchfiltercontroller = TextEditingController();
   final auth = FirebaseAuth.instance;
   bool loading = false;
-  bool isAdmin = false; // Flag to determine if user has admin privileges
+  bool isAdmin = false;
   final fireStore =
       FirebaseFirestore.instance.collection('All Courses').snapshots();
+
+  // For responsive grid view
+  int _calculateCrossAxisCount(double width) {
+    if (width > 1200) return 4;
+    if (width > 900) return 3;
+    if (width > 600) return 2;
+    return 1;
+  }
 
   @override
   void initState() {
@@ -29,7 +37,6 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
     _checkAdminStatus();
   }
 
-  // Function to check if current user has admin privileges
   Future<void> _checkAdminStatus() async {
     try {
       String? userType = checkUserAuthenticationType();
@@ -39,50 +46,100 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
         });
       }
     } catch (e) {
-      // Handle error
       print("Error checking admin status: $e");
     }
   }
 
-  // Function to refresh course list
   void _refreshCourses() {
-    setState(() {
-      // This will trigger a rebuild and fetch the latest data
-    });
+    setState(() {});
   }
 
-  // Function to show Add Course dialog
   void _showAddCourseDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Add New Course'),
-          content: Text('Would you like to add a new course?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel'),
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ColorManager.primary,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => AddCourse(onCourseAdded: _refreshCourses),
-                  ),
-                );
-              },
-              child: Text('Add Course'),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.add_circle,
+                  color: ColorManager.primary,
+                  size: 48,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Add New Course',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Would you like to add a new course to the platform?',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ColorManager.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) =>
+                                    AddCourse(onCourseAdded: _refreshCourses),
+                          ),
+                        );
+                      },
+                      child: const Text('Add Course'),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );
@@ -97,24 +154,27 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
     final Size screensize = MediaQuery.of(context).size;
     final double height = screensize.height;
     final double width = screensize.width;
+
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
+      backgroundColor: const Color(0xFFF8F9FA),
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddCourseDialog,
         backgroundColor: ColorManager.primary,
-        child: Icon(Icons.add),
+        icon: const Icon(Icons.add),
+        label: const Text('Add Course'),
         tooltip: 'Add New Course',
       ),
       body: Column(
         children: [
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.05),
                   blurRadius: 10,
-                  offset: Offset(0, 4),
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -122,39 +182,30 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
               children: [
                 Expanded(
                   child: Container(
-                    width: width * 0.833,
-                    height: height * 0.04875,
-                    decoration: ShapeDecoration(
+                    height: 50,
+                    decoration: BoxDecoration(
                       color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      shadows: [
-                        BoxShadow(
-                          color: Color(0x3F000000),
-                          blurRadius: 4,
-                          offset: Offset(0, 4),
-                          spreadRadius: 0,
-                        ),
-                      ],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
                     ),
                     child: TextFormField(
-                      textAlign: TextAlign.justify,
                       controller: searchfiltercontroller,
-                      cursorColor: Color(0xff7455F7),
+                      cursorColor: ColorManager.primary,
                       decoration: InputDecoration(
-                        icon: Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            width * 0.03,
-                            height * 0.001,
-                            0,
-                            height * 0.001,
-                          ),
-                          child: Icon(Icons.search),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          color: ColorManager.primary,
                         ),
-                        hintText: 'Search For The Course',
-                        iconColor: Color(0xff7455F7),
+                        hintText: 'Search for courses...',
+                        hintStyle: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 15,
+                        ),
                         border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                       ),
                       onChanged: (value) {
                         setState(() {});
@@ -162,17 +213,20 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
                     ),
                   ),
                 ),
-                if (isAdmin) ...[
-                  SizedBox(width: 16),
+                if (isAdmin && width > 600) ...[
+                  const SizedBox(width: 16),
                   ElevatedButton.icon(
-                    icon: Icon(Icons.add),
-                    label: Text('Add Course'),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Course'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: ColorManager.primary,
                       foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                     onPressed: _showAddCourseDialog,
@@ -181,67 +235,182 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
               ],
             ),
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                Text(
+                  'All Courses',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+                const Spacer(),
+                // Could add filter/sort options here
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
           StreamBuilder<QuerySnapshot>(
             stream: fireStore,
             builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting)
-                return Center(child: CircularProgressIndicator());
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Expanded(
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: ColorManager.primary,
+                    ),
+                  ),
+                );
+              }
 
-              if (snapshot.hasError)
-                return Center(child: Text('Error: ${snapshot.error}'));
+              if (snapshot.hasError) {
+                return Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: Colors.red,
+                          size: 60,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Error: ${snapshot.error}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
 
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
-                return Center(child: Text('No courses available'));
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.library_books,
+                          color: Colors.grey.shade400,
+                          size: 80,
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'No courses available',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (isAdmin) ...[
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.add),
+                            label: const Text('Add your first course'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: ColorManager.primary,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: _showAddCourseDialog,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              // Filter courses based on search text
+              final filteredDocs =
+                  snapshot.data!.docs.where((doc) {
+                    final coursename =
+                        doc['Course Name'].toString().toLowerCase();
+                    final searchText =
+                        searchfiltercontroller.text.toLowerCase();
+                    return searchText.isEmpty ||
+                        coursename.contains(searchText);
+                  }).toList();
+
+              if (filteredDocs.isEmpty) {
+                return Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          color: Colors.grey.shade400,
+                          size: 80,
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'No courses match your search',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        OutlinedButton(
+                          onPressed: () {
+                            searchfiltercontroller.clear();
+                            setState(() {});
+                          },
+                          child: const Text('Clear search'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
 
               return Expanded(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: ListView.separated(
-                    separatorBuilder: (context, index) {
-                      return SizedBox(height: height * 0.0125);
-                    },
-                    itemCount: snapshot.data!.docs.length,
-                    itemBuilder: (context, index) {
-                      final coursename =
-                          snapshot.data!.docs[index]['Course Name'].toString();
-                      if (searchfiltercontroller.text.isEmpty) {
-                        return Padding(
-                          padding: EdgeInsets.only(bottom: height * 0.02),
-                          child: Coursecardview(
+                  padding: const EdgeInsets.all(16),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final crossAxisCount = _calculateCrossAxisCount(
+                        constraints.maxWidth,
+                      );
+
+                      return GridView.builder(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: width > 600 ? 0.9 : 0.8,
+                        ),
+                        itemCount: filteredDocs.length,
+                        itemBuilder: (context, index) {
+                          final doc = filteredDocs[index];
+                          return Coursecardview(
                             loading: loading,
-                            courseName:
-                                snapshot.data!.docs[index]['Course Name']
-                                    .toString(),
-                            coursePrice:
-                                snapshot.data!.docs[index]['Course Price']
-                                    .toString(),
-                            courseImgLink:
-                                snapshot.data!.docs[index]['Course Img Link']
-                                    .toString(),
+                            courseName: doc['Course Name'].toString(),
+                            coursePrice: doc['Course Price'].toString(),
+                            courseImgLink: doc['Course Img Link'].toString(),
                             courseDiscription:
-                                snapshot.data!.docs[index]['Course Discription']
-                                    .toString(),
-                            // teacherName: snapshot.data!.docs[index]['Teacher'] != null ?
-                            //     snapshot.data!.docs[index]['Teacher']['Name']?.toString() : 'Not Assigned',
+                                doc['Course Discription'].toString(),
                             ontap: () {
                               setState(() {
                                 loading = true;
                               });
 
                               searchAndCreateCourse1(
-                                    snapshot.data!.docs[index]['Course Name']
-                                        .toString(),
-                                    snapshot.data!.docs[index]['Course Price']
-                                        .toString(),
-                                    snapshot
-                                        .data!
-                                        .docs[index]['Course Img Link']
-                                        .toString(),
-                                    snapshot
-                                        .data!
-                                        .docs[index]['Course Discription']
-                                        .toString(),
+                                    doc['Course Name'].toString(),
+                                    doc['Course Price'].toString(),
+                                    doc['Course Img Link'].toString(),
+                                    doc['Course Discription'].toString(),
                                   )
                                   .then((value) {
                                     setState(() {
@@ -254,59 +423,9 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
                                     });
                                   });
                             },
-                          ),
-                        );
-                      } else if (coursename.toLowerCase().toString().contains(
-                        searchfiltercontroller.text.toLowerCase().toString(),
-                      )) {
-                        return Coursecardview(
-                          loading: loading,
-                          courseName:
-                              snapshot.data!.docs[index]['Course Name']
-                                  .toString(),
-                          coursePrice:
-                              snapshot.data!.docs[index]['Course Price']
-                                  .toString(),
-                          courseImgLink:
-                              snapshot.data!.docs[index]['Course Img Link']
-                                  .toString(),
-                          courseDiscription:
-                              snapshot.data!.docs[index]['Course Discription']
-                                  .toString(),
-                          // teacherName: snapshot.data!.docs[index]['Teacher'] != null ?
-                          //     snapshot.data!.docs[index]['Teacher']['Name']?.toString() : 'Not Assigned',
-                          ontap: () {
-                            setState(() {
-                              loading = true;
-                            });
-
-                            searchAndCreateCourse1(
-                                  snapshot.data!.docs[index]['Course Name']
-                                      .toString(),
-                                  snapshot.data!.docs[index]['Course Price']
-                                      .toString(),
-                                  snapshot.data!.docs[index]['Course Img Link']
-                                      .toString(),
-                                  snapshot
-                                      .data!
-                                      .docs[index]['Course Discription']
-                                      .toString(),
-                                )
-                                .then((value) {
-                                  setState(() {
-                                    loading = false;
-                                  });
-                                })
-                                .onError((error, stackTrace) {
-                                  setState(() {
-                                    loading = false;
-                                  });
-                                });
-                          },
-                        );
-                      } else {
-                        return Container();
-                      }
+                          );
+                        },
+                      );
                     },
                   ),
                 ),
@@ -325,27 +444,23 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
     String coursediscription,
   ) async {
     FirebaseFirestore firestore = FirebaseFirestore.instance;
-    String usersCollectionPath = 'Users'; // The collection name
-    String? userEmailsDocumentId =
-        checkUserAuthenticationType(); // The document name
-    String courseFieldKey =
-        coursename; // The field key for the course data within the emails document
+    String usersCollectionPath = 'Users';
+    String? userEmailsDocumentId = checkUserAuthenticationType();
+    String courseFieldKey = coursename;
 
-    // Reference to the emails document in the users collection
     DocumentReference emailsDocumentRef = firestore
         .collection(usersCollectionPath)
+        .doc('admin')
+        .collection("accounts")
         .doc(userEmailsDocumentId);
 
-    // Get the current snapshot of the emails document
     DocumentSnapshot emailsSnapshot = await emailsDocumentRef.get();
 
     Map<String, dynamic> emailsData =
         emailsSnapshot.data() as Map<String, dynamic>;
 
-    // Check if the courseFieldKey already exists and is a list
     if (emailsData.containsKey(courseFieldKey) &&
         emailsData[courseFieldKey] is List) {
-      // CourseFieldKey exists and is a list, print its values
       List<dynamic> courseList = emailsData[courseFieldKey];
       if (courseList[0] == 0) {
         Navigator.push(
@@ -354,44 +469,32 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
             builder:
                 (context) => CourseDetails(
                   coursename: coursename,
-                  courseprice: courseprice,
-                  courseImage: courseimg,
-                  coursediscription: coursediscription,
+                  // courseprice: courseprice,
+                  // courseImage: courseimg,
+                  // coursediscription: coursediscription,
                 ),
           ),
         );
-      } // commented for while testing
+      }
       if (courseList[0] == 2) {
-        // Navigator.push(
-        //     context,
-        //     MaterialPageRoute(
-        //       builder: (context) => NewSubjectList(
-        //           coursename: coursename, courseimglink: courseimg),
-        //     )); // commeted till Newsubject list not created//
+        // Navigator.push for subject list would go here
       }
     } else {
-      // CourseFieldKey does not exist as a list, add it as an empty list
-      await emailsDocumentRef.set(
-        {
-          courseFieldKey: [0],
-
-          // Initialize with a list containing the value 0
-        },
-        SetOptions(merge: true),
-      ); // Using merge to update the document without overwriting other fields
+      await emailsDocumentRef.set({
+        courseFieldKey: [0],
+      }, SetOptions(merge: true));
       Navigator.push(
         context,
         MaterialPageRoute(
           builder:
               (context) => CourseDetails(
                 coursename: coursename,
-                courseprice: courseprice,
-                courseImage: courseimg,
-                coursediscription: coursediscription,
+                // courseprice: courseprice,
+                // courseImage: courseimg,
+                // coursediscription: coursediscription,
               ),
         ),
       );
-      ///////
     }
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:luyip_website_edu/Courses/addvideo.dart';
 import 'package:luyip_website_edu/Courses/allcourses.dart';
 import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/students.dart';
 import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/teachers.dart';
@@ -41,7 +42,7 @@ class _AdminDashboardContainerState extends State<AdminDashboardContainer> {
       case 'Teachers':
         return const TeachersContent();
       case 'Library':
-        return const LibraryContent();
+        return const AddLecturesAdmin();
       case 'Assessments':
         return const AssessmentsContent();
       case 'Schedule':

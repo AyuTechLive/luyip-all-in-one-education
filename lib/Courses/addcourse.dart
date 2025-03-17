@@ -1,7 +1,9 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:luyip_website_edu/Courses/helper/add_course_teacher.dart';
+import 'package:luyip_website_edu/Courses/helper/file_upload_handler.dart';
 import 'package:luyip_website_edu/Courses/helper/image_upload_handler.dart';
 import 'package:luyip_website_edu/helpers/roundbutton.dart';
 import 'package:luyip_website_edu/helpers/utils.dart';
@@ -28,6 +30,11 @@ class _AddCourseState extends State<AddCourse> {
   final discountPercentageController = TextEditingController();
   final durationController = TextEditingController();
   final prerequisitesController = TextEditingController();
+  final previewPdfController = TextEditingController();
+  final previewVideoController = TextEditingController();
+  final syllabusPdfController = TextEditingController();
+  late FileUploadHandler previewPdfHandler;
+  late FileUploadHandler syllabusPdfHandler;
 
   bool isFeaturesCourse = false;
   String selectedCategory = 'Programming';
@@ -48,10 +55,31 @@ class _AddCourseState extends State<AddCourse> {
 
   // Use the ImageUploadHandler instead of direct File handling
   late ImageUploadHandler imageHandler;
+  Future<void> _handleFileUpload({
+    required FileUploadHandler handler,
+    required TextEditingController controller,
+    required String storagePath,
+  }) async {
+    final success = await handler.pickFile();
+    if (!success) return;
+
+    setState(() => loading = true);
+    try {
+      final url = await handler.uploadFile(storagePath);
+      controller.text = url;
+      Utils().toastMessage('File uploaded successfully!');
+    } catch (e) {
+      Utils().toastMessage('Upload failed: ${e.toString()}');
+    } finally {
+      setState(() => loading = false);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    previewPdfHandler = FileUploadHandler(); // No need for fileType parameter
+    syllabusPdfHandler = FileUploadHandler();
     imageHandler = ImageUploadHandler();
   }
 
@@ -182,6 +210,65 @@ class _AddCourseState extends State<AddCourse> {
                           maxLines: 3,
                         ),
                         SizedBox(height: 16),
+                        _buildSectionTitle('Additional Materials'),
+                        SizedBox(height: 16),
+                        // Preview Video Link
+                        _buildTextField(
+                          controller: previewVideoController,
+                          labelText: 'Preview Video Link',
+                          hintText: 'Enter YouTube/Vimeo URL',
+                          prefixIcon: Icons.video_library,
+                        ),
+                        SizedBox(height: 16),
+
+                        // Preview PDF Upload
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: previewPdfController,
+                                labelText: 'Preview PDF',
+                                hintText: 'Upload course preview PDF',
+                                prefixIcon: Icons.picture_as_pdf,
+                                // readOnly: true,
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.upload),
+                              onPressed:
+                                  () async => _handleFileUpload(
+                                    handler: previewPdfHandler,
+                                    controller: previewPdfController,
+                                    storagePath: 'course_previews',
+                                  ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 16),
+
+                        // Syllabus PDF Upload
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: syllabusPdfController,
+                                labelText: 'Syllabus PDF',
+                                hintText: 'Upload course syllabus',
+                                prefixIcon: Icons.assignment,
+                                // readOnly: true,
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.upload),
+                              onPressed:
+                                  () async => _handleFileUpload(
+                                    handler: syllabusPdfHandler,
+                                    controller: syllabusPdfController,
+                                    storagePath: 'course_syllabi',
+                                  ),
+                            ),
+                          ],
+                        ),
 
                         // Featured course checkbox
                         CheckboxListTile(
@@ -401,6 +488,12 @@ class _AddCourseState extends State<AddCourse> {
                 : discountPercentageController.text,
         'Duration': durationController.text,
         'Prerequisites': prerequisitesController.text,
+        if (previewVideoController.text.isNotEmpty)
+          'PreviewVideo': previewVideoController.text,
+        if (previewPdfController.text.isNotEmpty)
+          'PreviewPDF': previewPdfController.text,
+        if (syllabusPdfController.text.isNotEmpty)
+          'SyllabusPDF': syllabusPdfController.text,
         'Is Featured': isFeaturesCourse,
         'Teachers': teachersData, // Store as array instead of single teacher
         'Created At': FieldValue.serverTimestamp(),

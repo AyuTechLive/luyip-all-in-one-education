@@ -44,6 +44,12 @@ dependencies:
   firebase_storage: ^12.4.4
   universal_html: ^2.2.4
   image_picker_web: ^4.0.0
+  cached_network_image: ^3.4.1
+  image_network: ^2.6.0
+  file_picker: ^9.1.0
+  youtube_player_iframe: ^5.2.1
+  youtube_explode_dart: ^2.3.10
+  video_player: ^2.9.3
 
 dev_dependencies:
   flutter_test:
