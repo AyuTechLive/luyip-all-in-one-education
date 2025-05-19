@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:luyip_website_edu/Courses/allcourses.dart';
+import 'package:luyip_website_edu/certificate/student_certificate_page.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
 import 'package:luyip_website_edu/student_dashboard/membership_card.dart';
 import 'package:luyip_website_edu/student_dashboard/sidebar_student.dart';
@@ -7,7 +8,7 @@ import 'package:luyip_website_edu/student_dashboard/sidebar_student.dart';
 // Main container widget for the student dashboard
 class StudentDashboardContainer extends StatefulWidget {
   const StudentDashboardContainer({Key? key, this.initialPage = 'Dashboard'})
-    : super(key: key);
+      : super(key: key);
 
   final String initialPage;
 
@@ -37,7 +38,7 @@ class _StudentDashboardContainerState extends State<StudentDashboardContainer> {
       case 'All Courses':
         return const AllCoursesScreen(userType: "student");
       case 'Certificates':
-        return const StudentDashboardContent();
+        return const CertificatesPage();
       case 'Take Membership':
         return const StudentIDCardScreen();
       case 'Schedule':

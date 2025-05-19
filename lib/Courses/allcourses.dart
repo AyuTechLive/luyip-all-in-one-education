@@ -127,9 +127,8 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder:
-                                (context) =>
-                                    AddCourse(onCourseAdded: _refreshCourses),
+                            builder: (context) =>
+                                AddCourse(onCourseAdded: _refreshCourses),
                           ),
                         );
                       },
@@ -157,16 +156,15 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      floatingActionButton:
-          isAdmin
-              ? FloatingActionButton.extended(
-                onPressed: _showAddCourseDialog,
-                backgroundColor: ColorManager.primary,
-                icon: const Icon(Icons.add),
-                label: const Text('Add Course'),
-                tooltip: 'Add New Course',
-              )
-              : null,
+      floatingActionButton: isAdmin
+          ? FloatingActionButton.extended(
+              onPressed: _showAddCourseDialog,
+              backgroundColor: ColorManager.primary,
+              icon: const Icon(Icons.add),
+              label: const Text('Add Course'),
+              tooltip: 'Add New Course',
+            )
+          : null,
       body: Column(
         children: [
           Container(
@@ -334,15 +332,11 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
               }
 
               // Filter courses based on search text
-              final filteredDocs =
-                  snapshot.data!.docs.where((doc) {
-                    final coursename =
-                        doc['Course Name'].toString().toLowerCase();
-                    final searchText =
-                        searchfiltercontroller.text.toLowerCase();
-                    return searchText.isEmpty ||
-                        coursename.contains(searchText);
-                  }).toList();
+              final filteredDocs = snapshot.data!.docs.where((doc) {
+                final coursename = doc['Course Name'].toString().toLowerCase();
+                final searchText = searchfiltercontroller.text.toLowerCase();
+                return searchText.isEmpty || coursename.contains(searchText);
+              }).toList();
 
               if (filteredDocs.isEmpty) {
                 return Expanded(
@@ -410,21 +404,19 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
                               });
 
                               searchAndCreateCourse1(
-                                    doc['Course Name'].toString(),
-                                    doc['Course Price'].toString(),
-                                    doc['Course Img Link'].toString(),
-                                    doc['Course Discription'].toString(),
-                                  )
-                                  .then((value) {
-                                    setState(() {
-                                      loading = false;
-                                    });
-                                  })
-                                  .onError((error, stackTrace) {
-                                    setState(() {
-                                      loading = false;
-                                    });
-                                  });
+                                doc['Course Name'].toString(),
+                                doc['Course Price'].toString(),
+                                doc['Course Img Link'].toString(),
+                                doc['Course Discription'].toString(),
+                              ).then((value) {
+                                setState(() {
+                                  loading = false;
+                                });
+                              }).onError((error, stackTrace) {
+                                setState(() {
+                                  loading = false;
+                                });
+                              });
                             },
                           );
                         },
@@ -469,13 +461,13 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder:
-                (context) => CourseDetails(
-                  coursename: coursename,
-                  // courseprice: courseprice,
-                  // courseImage: courseimg,
-                  // coursediscription: coursediscription,
-                ),
+            builder: (context) => CourseDetails(
+              userRole: 'admin',
+              coursename: coursename,
+              // courseprice: courseprice,
+              // courseImage: courseimg,
+              // coursediscription: coursediscription,
+            ),
           ),
         );
       }
@@ -489,13 +481,13 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder:
-              (context) => CourseDetails(
-                coursename: coursename,
-                // courseprice: courseprice,
-                // courseImage: courseimg,
-                // coursediscription: coursediscription,
-              ),
+          builder: (context) => CourseDetails(
+            userRole: 'admin',
+            coursename: coursename,
+            // courseprice: courseprice,
+            // courseImage: courseimg,
+            // coursediscription: coursediscription,
+          ),
         ),
       );
     }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:luyip_website_edu/Courses/addvideo.dart';
 import 'package:luyip_website_edu/Courses/allcourses.dart';
+import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/manage_test.dart';
 import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/students.dart';
 import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/teachers.dart';
 import 'package:luyip_website_edu/admin_dashboard/dummyadmin.dart';
@@ -10,7 +11,7 @@ import 'package:luyip_website_edu/helpers/colors.dart';
 // Create a main dashboard container that will hold both sidebar and content
 class AdminDashboardContainer extends StatefulWidget {
   const AdminDashboardContainer({Key? key, this.initialPage = 'Dashboard'})
-    : super(key: key);
+      : super(key: key);
 
   final String initialPage;
 
@@ -40,7 +41,9 @@ class _AdminDashboardContainerState extends State<AdminDashboardContainer> {
       case 'Students':
         return const StudentsContent();
       case 'Teachers':
-        return const TeachersContent();
+        return const ManageTestsPage(
+          role: 'admin',
+        );
       case 'Library':
         return const AddLecturesAdmin();
       case 'Assessments':
@@ -447,10 +450,9 @@ class DashboardSidebar extends StatelessWidget {
               child: Text(
                 label,
                 style: TextStyle(
-                  color:
-                      isActive
-                          ? Colors.white
-                          : ColorManager.light.withOpacity(0.8),
+                  color: isActive
+                      ? Colors.white
+                      : ColorManager.light.withOpacity(0.8),
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                   fontSize: 14,
                 ),
@@ -460,10 +462,9 @@ class DashboardSidebar extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color:
-                      isActive
-                          ? Colors.white
-                          : ColorManager.secondary.withOpacity(0.8),
+                  color: isActive
+                      ? Colors.white
+                      : ColorManager.secondary.withOpacity(0.8),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_network/image_network.dart';
 import 'package:luyip_website_edu/Courses/course_materials.dart';
+import 'package:luyip_website_edu/Courses/mark_course_complete.dart';
 import 'package:luyip_website_edu/Courses/transaction_service.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
 import 'package:razorpay_web/razorpay_web.dart';
@@ -11,8 +12,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 class CourseDetails extends StatefulWidget {
   final String coursename;
+  final String userRole;
 
-  const CourseDetails({super.key, required this.coursename});
+  const CourseDetails(
+      {super.key, required this.coursename, required this.userRole});
 
   @override
   State<CourseDetails> createState() => _CourseDetailsState();
@@ -32,11 +35,10 @@ class _CourseDetailsState extends State<CourseDetails> {
   @override
   void initState() {
     super.initState();
-    _courseFuture =
-        FirebaseFirestore.instance
-            .collection('All Courses')
-            .doc(widget.coursename)
-            .get();
+    _courseFuture = FirebaseFirestore.instance
+        .collection('All Courses')
+        .doc(widget.coursename)
+        .get();
 
     _scrollController.addListener(() {
       setState(() {
@@ -53,6 +55,39 @@ class _CourseDetailsState extends State<CourseDetails> {
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  }
+
+  Widget _buildCourseCompletionButton() {
+    // Only show to admins and teachers
+    if (widget.userRole != 'admin' && widget.userRole != 'teacher') {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: ElevatedButton.icon(
+        icon: const Icon(Icons.check_circle),
+        label: const Text('Mark Course Complete'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: ColorManager.primary,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, 50),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MarkCourseCompletePage(
+                courseName: widget.coursename,
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _startPayment(double amount, String courseName) async {
@@ -105,11 +140,10 @@ class _CourseDetailsState extends State<CourseDetails> {
 
     try {
       // Get course price from Firestore
-      final courseDoc =
-          await _firestore
-              .collection('All Courses')
-              .doc(widget.coursename)
-              .get();
+      final courseDoc = await _firestore
+          .collection('All Courses')
+          .doc(widget.coursename)
+          .get();
 
       String priceStr =
           (courseDoc.data() as Map<String, dynamic>)['Course Price'] ?? '0';
@@ -176,13 +210,12 @@ class _CourseDetailsState extends State<CourseDetails> {
   Future<void> _checkEnrollmentStatus() async {
     final user = _auth.currentUser;
     if (user != null) {
-      final userDoc =
-          await _firestore
-              .collection('Users')
-              .doc('student')
-              .collection('accounts')
-              .doc(user.email)
-              .get();
+      final userDoc = await _firestore
+          .collection('Users')
+          .doc('student')
+          .collection('accounts')
+          .doc(user.email)
+          .get();
       if (userDoc.exists) {
         final myCourses = userDoc.data()?['My Courses'] as List<dynamic>? ?? [];
         setState(() {
@@ -261,15 +294,14 @@ class _CourseDetailsState extends State<CourseDetails> {
             // Remove currency symbol and convert to double
             price =
                 double.tryParse(priceStr.replaceAll(RegExp(r'[^\d.]'), '')) ??
-                0.0;
+                    0.0;
           }
 
           return NestedScrollView(
             controller: _scrollController,
-            headerSliverBuilder:
-                (context, innerBoxIsScrolled) => [
-                  _buildSliverAppBar(data, size),
-                ],
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
+              _buildSliverAppBar(data, size),
+            ],
             body: Container(
               decoration: BoxDecoration(
                 color: ColorManager.background,
@@ -291,47 +323,44 @@ class _CourseDetailsState extends State<CourseDetails> {
           );
         },
       ),
-      floatingActionButton:
-          _isEnrolled || _isProcessingPayment
-              ? null
-              : AnimatedOpacity(
-                opacity: _isScrolled ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: FutureBuilder<DocumentSnapshot>(
-                  future: _courseFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting ||
-                        !snapshot.hasData ||
-                        !snapshot.data!.exists) {
-                      return Container();
-                    }
+      floatingActionButton: _isEnrolled || _isProcessingPayment
+          ? null
+          : AnimatedOpacity(
+              opacity: _isScrolled ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: FutureBuilder<DocumentSnapshot>(
+                future: _courseFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting ||
+                      !snapshot.hasData ||
+                      !snapshot.data!.exists) {
+                    return Container();
+                  }
 
-                    var data = snapshot.data!.data() as Map<String, dynamic>;
-                    String priceStr = data['Course Price'] ?? 'FREE';
-                    double price = 0.0;
-                    if (priceStr.toLowerCase() != 'free') {
-                      price =
-                          double.tryParse(
-                            priceStr.replaceAll(RegExp(r'[^\d.]'), ''),
-                          ) ??
-                          0.0;
-                    }
+                  var data = snapshot.data!.data() as Map<String, dynamic>;
+                  String priceStr = data['Course Price'] ?? 'FREE';
+                  double price = 0.0;
+                  if (priceStr.toLowerCase() != 'free') {
+                    price = double.tryParse(
+                          priceStr.replaceAll(RegExp(r'[^\d.]'), ''),
+                        ) ??
+                        0.0;
+                  }
 
-                    return FloatingActionButton.extended(
-                      onPressed: () => _handleEnrollment(price),
-                      backgroundColor: ColorManager.primary,
-                      label: Text(
-                        price > 0 ? 'PAY & ENROLL' : 'ENROLL NOW',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      icon:
-                          price > 0
-                              ? const Icon(Icons.payment)
-                              : const Icon(Icons.school),
-                    );
-                  },
-                ),
+                  return FloatingActionButton.extended(
+                    onPressed: () => _handleEnrollment(price),
+                    backgroundColor: ColorManager.primary,
+                    label: Text(
+                      price > 0 ? 'PAY & ENROLL' : 'ENROLL NOW',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    icon: price > 0
+                        ? const Icon(Icons.payment)
+                        : const Icon(Icons.school),
+                  );
+                },
               ),
+            ),
     );
   }
 
@@ -365,10 +394,9 @@ class _CourseDetailsState extends State<CourseDetails> {
               onTap: () => setState(() => _activeTab = index),
               child: Container(
                 decoration: BoxDecoration(
-                  color:
-                      _activeTab == index
-                          ? ColorManager.primary
-                          : ColorManager.cardColor,
+                  color: _activeTab == index
+                      ? ColorManager.primary
+                      : ColorManager.cardColor,
                   borderRadius: BorderRadius.circular(30),
                 ),
                 child: Center(
@@ -377,10 +405,9 @@ class _CourseDetailsState extends State<CourseDetails> {
                     children: [
                       Icon(
                         tabs[index]['icon'] as IconData,
-                        color:
-                            _activeTab == index
-                                ? Colors.white
-                                : ColorManager.textMedium,
+                        color: _activeTab == index
+                            ? Colors.white
+                            : ColorManager.textMedium,
                         size: 16,
                       ),
                       const SizedBox(width: 4),
@@ -389,10 +416,9 @@ class _CourseDetailsState extends State<CourseDetails> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color:
-                              _activeTab == index
-                                  ? Colors.white
-                                  : ColorManager.textMedium,
+                          color: _activeTab == index
+                              ? Colors.white
+                              : ColorManager.textMedium,
                         ),
                       ),
                     ],
@@ -596,6 +622,7 @@ class _CourseDetailsState extends State<CourseDetails> {
                     ],
                   ),
                   const SizedBox(height: 12),
+                  _buildCourseCompletionButton(),
                   Text(
                     data['Course Name'] ?? widget.coursename,
                     style: const TextStyle(
@@ -1165,97 +1192,97 @@ class _CourseDetailsState extends State<CourseDetails> {
         // Browse All Subjects Card
         _isEnrolled
             ? InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) =>
-                            CourseMaterials(courseName: widget.coursename),
-                  ),
-                );
-              },
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      ColorManager.primary.withOpacity(0.8),
-                      ColorManager.primary,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          CourseMaterials(courseName: widget.coursename),
+                    ),
+                  );
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        ColorManager.primary.withOpacity(0.8),
+                        ColorManager.primary,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
                     ],
                   ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.book, color: Colors.white, size: 36),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Browse All Subjects',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'View all course subjects and materials',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white.withOpacity(0.9),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.arrow_forward,
+                          color: ColorManager.primary,
+                          size: 20,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.book, color: Colors.white, size: 36),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Browse All Subjects',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'View all course subjects and materials',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.white.withOpacity(0.9),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.arrow_forward,
-                        color: ColorManager.primary,
-                        size: 20,
-                      ),
+                    Icon(Icons.lock, color: Colors.grey.shade600),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Enroll to access all subjects',
+                      style:
+                          TextStyle(fontSize: 16, color: Colors.grey.shade600),
                     ),
                   ],
                 ),
               ),
-            )
-            : Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.lock, color: Colors.grey.shade600),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Enroll to access all subjects',
-                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            ),
 
         // Key Documents Section
         Text(
@@ -1474,10 +1501,9 @@ class _CourseDetailsState extends State<CourseDetails> {
             width: size.width * 0.7,
             height: 56,
             child: ElevatedButton(
-              onPressed:
-                  _isEnrolled || _isProcessingPayment
-                      ? null
-                      : () => _handleEnrollment(price),
+              onPressed: _isEnrolled || _isProcessingPayment
+                  ? null
+                  : () => _handleEnrollment(price),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: ColorManager.primary,
@@ -1487,45 +1513,44 @@ class _CourseDetailsState extends State<CourseDetails> {
                 elevation: 0,
                 disabledBackgroundColor: Colors.grey.shade300,
               ),
-              child:
-                  _isProcessingPayment
-                      ? const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(),
+              child: _isProcessingPayment
+                  ? const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(),
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          'PROCESSING...',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                           ),
-                          SizedBox(width: 12),
-                          Text(
-                            'PROCESSING...',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          price > 0 ? Icons.payment : Icons.school,
+                          size: 24,
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          price > 0
+                              ? 'PAY ₹${price.toStringAsFixed(2)} & ENROLL'
+                              : 'ENROLL NOW',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                           ),
-                        ],
-                      )
-                      : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            price > 0 ? Icons.payment : Icons.school,
-                            size: 24,
-                          ),
-                          SizedBox(width: 12),
-                          Text(
-                            price > 0
-                                ? 'PAY ₹${price.toStringAsFixed(2)} & ENROLL'
-                                : 'ENROLL NOW',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
+                    ),
             ),
           ),
           if (_isEnrolled)
