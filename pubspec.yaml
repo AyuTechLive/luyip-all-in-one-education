@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.7.0
+  sdk: ^3.6.0
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -50,6 +50,9 @@ dependencies:
   youtube_player_iframe: ^5.2.1
   youtube_explode_dart: ^2.3.10
   video_player: ^2.9.3
+  razorpay_web: ^2.0.2
+  qr_flutter: ^4.1.0
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:

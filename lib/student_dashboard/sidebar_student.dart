@@ -1,126 +1,12 @@
+// Student sidebar implementation with light color theme
 import 'package:flutter/material.dart';
-import 'package:luyip_website_edu/Courses/addvideo.dart';
-import 'package:luyip_website_edu/Courses/allcourses.dart';
-import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/students.dart';
-import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/teachers.dart';
-import 'package:luyip_website_edu/admin_dashboard/dummyadmin.dart';
-import 'package:luyip_website_edu/auth/loginscreen.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
 
-// Create a main dashboard container that will hold both sidebar and content
-class AdminDashboardContainer extends StatefulWidget {
-  const AdminDashboardContainer({Key? key, this.initialPage = 'Dashboard'})
-    : super(key: key);
-
-  final String initialPage;
-
-  @override
-  State<AdminDashboardContainer> createState() =>
-      _AdminDashboardContainerState();
-}
-
-class _AdminDashboardContainerState extends State<AdminDashboardContainer> {
-  late String _currentPage;
-  late Widget _currentContent;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentPage = widget.initialPage;
-    _currentContent = _getContentForPage(_currentPage);
-  }
-
-  Widget _getContentForPage(String pageName) {
-    // Return the appropriate content widget based on page name
-    switch (pageName) {
-      case 'Dashboard':
-        return const DashboardContent();
-      case 'Courses':
-        return const AllCoursesScreen(userType: "admin");
-      case 'Students':
-        return const StudentsContent();
-      case 'Teachers':
-        return const TeachersContent();
-      case 'Library':
-        return const AddLecturesAdmin();
-      case 'Assessments':
-        return const AssessmentsContent();
-      case 'Schedule':
-        return const ScheduleContent();
-      case 'Payments':
-        return const PaymentsContent();
-      case 'Notifications':
-        return const NotificationsContent();
-      case 'Settings':
-        return const SettingsContent();
-      default:
-        return const DashboardContent();
-    }
-  }
-
-  void _changePage(String pageName) {
-    setState(() {
-      _currentPage = pageName;
-      _currentContent = _getContentForPage(pageName);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        title: Text(
-          'Luyip Admin Dashboard - $_currentPage',
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        backgroundColor: ColorManager.primary,
-        actions: [
-          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {},
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: CircleAvatar(
-              backgroundColor: ColorManager.primaryLight,
-              child: IconButton(
-                icon: Icon(
-                  Icons.person_outline,
-                  color: ColorManager.primaryDark,
-                ),
-                onPressed: () {},
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: Container(
-        color: ColorManager.background,
-        child: Row(
-          children: [
-            // Pass the current page and page change callback to sidebar
-            DashboardSidebar(
-              selectedPage: _currentPage,
-              onPageChanged: _changePage,
-            ),
-
-            // Dynamic content area based on selected page
-            Expanded(child: _currentContent),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Modified sidebar that takes a callback for page changes
-class DashboardSidebar extends StatelessWidget {
+class StudentSidebar extends StatelessWidget {
   final String selectedPage;
   final Function(String) onPageChanged;
 
-  const DashboardSidebar({
+  const StudentSidebar({
     Key? key,
     required this.selectedPage,
     required this.onPageChanged,
@@ -129,14 +15,15 @@ class DashboardSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: double.infinity, // Ensures it fills the entire height
-      width: 250, // Keeps the fixed width for the sidebar
+      height: double.infinity,
+      width: 250,
       child: Container(
-        color: ColorManager.dark, // Using dark slate instead of pure black
+        // Use a light color for the sidebar background
+        color: const Color(0xFFF5F7FA),
         child: Column(
           children: [
             const SizedBox(height: 20),
-            // Logo area with gradient background
+            // Student profile area with gradient background
             Container(
               padding: const EdgeInsets.symmetric(vertical: 24),
               margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -147,6 +34,13 @@ class DashboardSidebar extends StatelessWidget {
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: ColorManager.primary.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: const Center(
                 child: Text(
@@ -160,9 +54,9 @@ class DashboardSidebar extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 24),
 
-            // Admin profile section
+            // Student profile section
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -171,7 +65,7 @@ class DashboardSidebar extends StatelessWidget {
                     radius: 24,
                     backgroundColor: ColorManager.primaryLight,
                     child: Text(
-                      "A",
+                      "S",
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -184,18 +78,18 @@ class DashboardSidebar extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Admin User",
+                        "Student Name",
                         style: TextStyle(
-                          color: Colors.white,
+                          color: ColorManager.textDark,
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        "System Administrator",
+                        "Computer Science",
                         style: TextStyle(
-                          color: ColorManager.light.withOpacity(0.7),
+                          color: ColorManager.textMedium,
                           fontSize: 12,
                         ),
                       ),
@@ -206,12 +100,12 @@ class DashboardSidebar extends StatelessWidget {
             ),
 
             const SizedBox(height: 24),
-            const Divider(
+            Divider(
               height: 1,
               thickness: 1,
               indent: 16,
               endIndent: 16,
-              color: Color(0xFF3A4750), // Slightly lighter than dark
+              color: ColorManager.textLight.withOpacity(0.2),
             ),
             const SizedBox(height: 16),
 
@@ -223,16 +117,16 @@ class DashboardSidebar extends StatelessWidget {
                 child: Text(
                   "MAIN MENU",
                   style: TextStyle(
-                    color: ColorManager.textLight,
+                    color: ColorManager.textMedium,
                     fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                     letterSpacing: 1.2,
                   ),
                 ),
               ),
             ),
 
-            // Menu items with enhanced styling
+            // Menu items
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -246,34 +140,36 @@ class DashboardSidebar extends StatelessWidget {
                     ),
                     _buildSidebarItem(
                       context,
-                      Icons.school_outlined,
-                      'Courses',
-                      isActive: selectedPage == 'Courses',
+                      Icons.class_outlined,
+                      'My Batches',
+                      isActive: selectedPage == 'My Batches',
+                      badge: '3',
                     ),
                     _buildSidebarItem(
                       context,
-                      Icons.people_outlined,
-                      'Students',
-                      isActive: selectedPage == 'Students',
+                      Icons.menu_book_outlined,
+                      'All Courses',
+                      isActive: selectedPage == 'All Courses',
                     ),
                     _buildSidebarItem(
                       context,
-                      Icons.person_outlined,
-                      'Teachers',
-                      isActive: selectedPage == 'Teachers',
+                      Icons.card_membership_outlined,
+                      'Certificates',
+                      isActive: selectedPage == 'Certificates',
+                      badge: '2',
                     ),
 
                     const SizedBox(height: 16),
-                    const Divider(
+                    Divider(
                       height: 1,
                       thickness: 1,
                       indent: 16,
                       endIndent: 16,
-                      color: Color(0xFF3A4750),
+                      color: ColorManager.textLight.withOpacity(0.2),
                     ),
                     const SizedBox(height: 16),
 
-                    // Management section title
+                    // Learning section title
                     Padding(
                       padding: const EdgeInsets.only(
                         left: 16,
@@ -283,17 +179,30 @@ class DashboardSidebar extends StatelessWidget {
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          "MANAGEMENT",
+                          "LEARNING",
                           style: TextStyle(
-                            color: ColorManager.textLight,
+                            color: ColorManager.textMedium,
                             fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w600,
                             letterSpacing: 1.2,
                           ),
                         ),
                       ),
                     ),
 
+                    _buildSidebarItem(
+                      context,
+                      Icons.calendar_today_outlined,
+                      'Schedule',
+                      isActive: selectedPage == 'Schedule',
+                    ),
+                    _buildSidebarItem(
+                      context,
+                      Icons.assignment_outlined,
+                      'Assignments',
+                      isActive: selectedPage == 'Assignments',
+                      badge: '4',
+                    ),
                     _buildSidebarItem(
                       context,
                       Icons.library_books_outlined,
@@ -302,36 +211,23 @@ class DashboardSidebar extends StatelessWidget {
                     ),
                     _buildSidebarItem(
                       context,
-                      Icons.assessment_outlined,
-                      'Assessments',
-                      isActive: selectedPage == 'Assessments',
-                      badge: '3',
-                    ),
-                    _buildSidebarItem(
-                      context,
-                      Icons.event_outlined,
-                      'Schedule',
-                      isActive: selectedPage == 'Schedule',
-                    ),
-                    _buildSidebarItem(
-                      context,
-                      Icons.payment_outlined,
-                      'Payments',
-                      isActive: selectedPage == 'Payments',
-                      badge: '5',
+                      Icons.workspace_premium_outlined,
+                      'Take Membership',
+                      isActive: selectedPage == 'Take Membership',
+                      hasProTag: true,
                     ),
 
                     const SizedBox(height: 16),
-                    const Divider(
+                    Divider(
                       height: 1,
                       thickness: 1,
                       indent: 16,
                       endIndent: 16,
-                      color: Color(0xFF3A4750),
+                      color: ColorManager.textLight.withOpacity(0.2),
                     ),
                     const SizedBox(height: 16),
 
-                    // System section title
+                    // Account section title
                     Padding(
                       padding: const EdgeInsets.only(
                         left: 16,
@@ -341,11 +237,11 @@ class DashboardSidebar extends StatelessWidget {
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          "SYSTEM",
+                          "ACCOUNT",
                           style: TextStyle(
-                            color: ColorManager.textLight,
+                            color: ColorManager.textMedium,
                             fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w600,
                             letterSpacing: 1.2,
                           ),
                         ),
@@ -354,10 +250,10 @@ class DashboardSidebar extends StatelessWidget {
 
                     _buildSidebarItem(
                       context,
-                      Icons.notifications_outlined,
-                      'Notifications',
-                      isActive: selectedPage == 'Notifications',
-                      badge: '12',
+                      Icons.message_outlined,
+                      'Messages',
+                      isActive: selectedPage == 'Messages',
+                      badge: '5',
                     ),
                     _buildSidebarItem(
                       context,
@@ -375,37 +271,37 @@ class DashboardSidebar extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: GestureDetector(
                 onTap: () {
-                  // Handle logout
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
-                    ),
-                  );
+                  // Handle logout logic here
+                  Navigator.pushReplacementNamed(context, '/login');
                 },
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: ColorManager.error.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        spreadRadius: 1,
+                        blurRadius: 3,
+                        offset: const Offset(0, 1),
                       ),
-                      child: Icon(
-                        Icons.logout,
-                        color: ColorManager.error,
-                        size: 18,
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.logout, color: ColorManager.error, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Logout",
+                        style: TextStyle(
+                          color: ColorManager.error,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      "Logout",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -421,16 +317,20 @@ class DashboardSidebar extends StatelessWidget {
     String label, {
     bool isActive = false,
     String? badge,
+    bool hasProTag = false,
   }) {
     return GestureDetector(
       onTap: () {
-        // Use the callback to change the page instead of navigating
+        // Use the callback to change the page
         onPageChanged(label);
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-          color: isActive ? ColorManager.primary : Colors.transparent,
+          color:
+              isActive
+                  ? ColorManager.primary.withOpacity(0.1)
+                  : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -438,8 +338,7 @@ class DashboardSidebar extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color:
-                  isActive ? Colors.white : ColorManager.light.withOpacity(0.8),
+              color: isActive ? ColorManager.primary : ColorManager.textMedium,
               size: 20,
             ),
             const SizedBox(width: 12),
@@ -448,28 +347,42 @@ class DashboardSidebar extends StatelessWidget {
                 label,
                 style: TextStyle(
                   color:
-                      isActive
-                          ? Colors.white
-                          : ColorManager.light.withOpacity(0.8),
+                      isActive ? ColorManager.primary : ColorManager.textDark,
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                   fontSize: 14,
                 ),
               ),
             ),
+            if (hasProTag)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: ColorManager.warning,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  "PRO",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             if (badge != null)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color:
                       isActive
-                          ? Colors.white
-                          : ColorManager.secondary.withOpacity(0.8),
+                          ? ColorManager.primary
+                          : ColorManager.secondary.withOpacity(0.7),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   badge,
-                  style: TextStyle(
-                    color: isActive ? ColorManager.primary : Colors.white,
+                  style: const TextStyle(
+                    color: Colors.white,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
@@ -481,3 +394,5 @@ class DashboardSidebar extends StatelessWidget {
     );
   }
 }
+
+// Student Dashboard Content

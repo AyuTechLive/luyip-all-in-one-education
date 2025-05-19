@@ -9,7 +9,8 @@ import 'package:luyip_website_edu/helpers/userauthtype.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
 
 class AllCoursesScreen extends StatefulWidget {
-  const AllCoursesScreen({super.key});
+  final String userType;
+  const AllCoursesScreen({super.key, required this.userType});
 
   @override
   State<AllCoursesScreen> createState() => _AllCoursesScreenState();
@@ -39,8 +40,7 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
 
   Future<void> _checkAdminStatus() async {
     try {
-      String? userType = checkUserAuthenticationType();
-      if (userType == 'admin') {
+      if (widget.userType == 'admin') {
         setState(() {
           isAdmin = true;
         });
@@ -157,13 +157,16 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddCourseDialog,
-        backgroundColor: ColorManager.primary,
-        icon: const Icon(Icons.add),
-        label: const Text('Add Course'),
-        tooltip: 'Add New Course',
-      ),
+      floatingActionButton:
+          isAdmin
+              ? FloatingActionButton.extended(
+                onPressed: _showAddCourseDialog,
+                backgroundColor: ColorManager.primary,
+                icon: const Icon(Icons.add),
+                label: const Text('Add Course'),
+                tooltip: 'Add New Course',
+              )
+              : null,
       body: Column(
         children: [
           Container(
@@ -450,7 +453,7 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
 
     DocumentReference emailsDocumentRef = firestore
         .collection(usersCollectionPath)
-        .doc('admin')
+        .doc(widget.userType)
         .collection("accounts")
         .doc(userEmailsDocumentId);
 

@@ -2,8 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_network/image_network.dart';
 import 'package:luyip_website_edu/Courses/course_materials.dart';
+import 'package:luyip_website_edu/Courses/transaction_service.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
+import 'package:razorpay_web/razorpay_web.dart';
+
 import '../helpers/userauthtype.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class CourseDetails extends StatefulWidget {
   final String coursename;
@@ -19,7 +23,12 @@ class _CourseDetailsState extends State<CourseDetails> {
   final ScrollController _scrollController = ScrollController();
   bool _isScrolled = false;
   int _activeTab = 0;
-
+  bool _isEnrolled = false;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  late Razorpay _razorpay;
+  bool _isProcessingPayment = false;
+  final TransactionService _transactionService = TransactionService();
   @override
   void initState() {
     super.initState();
@@ -34,6 +43,181 @@ class _CourseDetailsState extends State<CourseDetails> {
         _isScrolled = _scrollController.offset > 80;
       });
     });
+    _initializeRazorpay();
+
+    _checkEnrollmentStatus();
+  }
+
+  void _initializeRazorpay() {
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  }
+
+  void _startPayment(double amount, String courseName) async {
+    if (_auth.currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('You need to be logged in to enroll'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isProcessingPayment = true;
+    });
+
+    try {
+      var options = {
+        'key':
+            'rzp_test_OIvgwDrw6v8gWS', // Replace with your actual Razorpay key
+        'amount':
+            (amount * 100).toInt(), // Amount in smallest currency unit (paise)
+        'name': 'LuYip Education',
+        'description': 'Enrollment for $courseName',
+        'prefill': {'email': _auth.currentUser?.email ?? ''},
+        'external': {
+          'wallets': ['paytm'],
+        },
+      };
+
+      _razorpay.open(options);
+    } catch (e) {
+      setState(() {
+        _isProcessingPayment = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    setState(() {
+      _isProcessingPayment = false;
+    });
+
+    try {
+      // Get course price from Firestore
+      final courseDoc =
+          await _firestore
+              .collection('All Courses')
+              .doc(widget.coursename)
+              .get();
+
+      String priceStr =
+          (courseDoc.data() as Map<String, dynamic>)['Course Price'] ?? '0';
+      // Remove currency symbol and convert to double
+      double amount =
+          double.tryParse(priceStr.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+
+      // Complete the enrollment process
+      await _transactionService.completeEnrollment(
+        transactionId: response.paymentId!,
+        amount: amount,
+        courseName: widget.coursename,
+        currency: 'INR',
+      );
+
+      setState(() {
+        _isEnrolled = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Payment successful! You are now enrolled in ${widget.coursename}',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error completing enrollment: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    setState(() {
+      _isProcessingPayment = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Payment failed: ${response.message}'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    setState(() {
+      _isProcessingPayment = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('External wallet selected: ${response.walletName}'),
+        backgroundColor: Colors.blue,
+      ),
+    );
+  }
+
+  Future<void> _checkEnrollmentStatus() async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      final userDoc =
+          await _firestore
+              .collection('Users')
+              .doc('student')
+              .collection('accounts')
+              .doc(user.email)
+              .get();
+      if (userDoc.exists) {
+        final myCourses = userDoc.data()?['My Courses'] as List<dynamic>? ?? [];
+        setState(() {
+          _isEnrolled = myCourses.contains(widget.coursename);
+        });
+      }
+    }
+  }
+
+  Future<void> _handleEnrollment(double price) async {
+    if (price <= 0) {
+      // If course is free, directly enroll without payment
+      try {
+        await _transactionService.enrollUserInCourse(widget.coursename);
+        setState(() {
+          _isEnrolled = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Successfully enrolled in ${widget.coursename}'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to enroll: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else {
+      // If course has a price, start payment flow
+      _startPayment(price, widget.coursename);
+    }
   }
 
   @override
@@ -70,6 +254,16 @@ class _CourseDetailsState extends State<CourseDetails> {
           List teachers = data['Teachers'] ?? [];
           List notices = data['Notices'] ?? [];
 
+          // Parse course price
+          String priceStr = data['Course Price'] ?? 'FREE';
+          double price = 0.0;
+          if (priceStr.toLowerCase() != 'free') {
+            // Remove currency symbol and convert to double
+            price =
+                double.tryParse(priceStr.replaceAll(RegExp(r'[^\d.]'), '')) ??
+                0.0;
+          }
+
           return NestedScrollView(
             controller: _scrollController,
             headerSliverBuilder:
@@ -89,7 +283,7 @@ class _CourseDetailsState extends State<CourseDetails> {
                   children: [
                     _buildTabBar(),
                     const SizedBox(height: 16),
-                    _buildTabContent(data, teachers, notices, size),
+                    _buildTabContent(data, teachers, notices, size, price),
                   ],
                 ),
               ),
@@ -97,19 +291,47 @@ class _CourseDetailsState extends State<CourseDetails> {
           );
         },
       ),
-      floatingActionButton: AnimatedOpacity(
-        opacity: _isScrolled ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 300),
-        child: FloatingActionButton.extended(
-          onPressed: _handleEnrollment,
-          backgroundColor: ColorManager.primary,
-          label: const Text(
-            'ENROLL NOW',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          icon: const Icon(Icons.school),
-        ),
-      ),
+      floatingActionButton:
+          _isEnrolled || _isProcessingPayment
+              ? null
+              : AnimatedOpacity(
+                opacity: _isScrolled ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: FutureBuilder<DocumentSnapshot>(
+                  future: _courseFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting ||
+                        !snapshot.hasData ||
+                        !snapshot.data!.exists) {
+                      return Container();
+                    }
+
+                    var data = snapshot.data!.data() as Map<String, dynamic>;
+                    String priceStr = data['Course Price'] ?? 'FREE';
+                    double price = 0.0;
+                    if (priceStr.toLowerCase() != 'free') {
+                      price =
+                          double.tryParse(
+                            priceStr.replaceAll(RegExp(r'[^\d.]'), ''),
+                          ) ??
+                          0.0;
+                    }
+
+                    return FloatingActionButton.extended(
+                      onPressed: () => _handleEnrollment(price),
+                      backgroundColor: ColorManager.primary,
+                      label: Text(
+                        price > 0 ? 'PAY & ENROLL' : 'ENROLL NOW',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      icon:
+                          price > 0
+                              ? const Icon(Icons.payment)
+                              : const Icon(Icons.school),
+                    );
+                  },
+                ),
+              ),
     );
   }
 
@@ -189,6 +411,7 @@ class _CourseDetailsState extends State<CourseDetails> {
     List teachers,
     List notices,
     Size size,
+    double price,
   ) {
     switch (_activeTab) {
       case 0:
@@ -201,7 +424,7 @@ class _CourseDetailsState extends State<CourseDetails> {
               const SizedBox(height: 24),
               _buildFeatureCards(data),
               const SizedBox(height: 40),
-              _buildEnrollSection(size),
+              _buildEnrollSection(size, price),
             ],
           ),
         );
@@ -230,10 +453,6 @@ class _CourseDetailsState extends State<CourseDetails> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // SvgPicture.asset(
-          //   'assets/images/not_found.svg', // Create or add this asset
-          //   height: 150,
-          // ),
           const SizedBox(height: 24),
           Text(
             'Course Not Found',
@@ -280,7 +499,6 @@ class _CourseDetailsState extends State<CourseDetails> {
         background: Stack(
           fit: StackFit.expand,
           children: [
-            // Course Image with gradient overlay
             Hero(
               tag: 'course-${widget.coursename}',
               child: ImageNetwork(
@@ -292,12 +510,11 @@ class _CourseDetailsState extends State<CourseDetails> {
                   child: CircularProgressIndicator(color: Colors.white),
                 ),
                 onError: Image.asset(
-                  'assets/images/placeholder_course.jpg', // Create or add this asset
+                  'assets/images/placeholder_course.jpg',
                   fit: BoxFit.cover,
                 ),
               ),
             ),
-            // Gradient overlay with brand color
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -310,7 +527,6 @@ class _CourseDetailsState extends State<CourseDetails> {
                 ),
               ),
             ),
-            // Course title and basic info
             Positioned(
               bottom: 20,
               left: 16,
@@ -407,7 +623,7 @@ class _CourseDetailsState extends State<CourseDetails> {
                       ),
                       const Spacer(),
                       Text(
-                        data['Price'] ?? 'FREE',
+                        data['Course Price'] ?? 'FREE',
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -419,7 +635,6 @@ class _CourseDetailsState extends State<CourseDetails> {
                 ],
               ),
             ),
-            // Back button with better tap area
             Positioned(
               top: 40,
               left: 8,
@@ -449,7 +664,6 @@ class _CourseDetailsState extends State<CourseDetails> {
             ),
           ],
         ),
-        // The title shown when the app bar is collapsed
         title: AnimatedOpacity(
           opacity: _isScrolled ? 1.0 : 0.0,
           duration: const Duration(milliseconds: 300),
@@ -720,12 +934,6 @@ class _CourseDetailsState extends State<CourseDetails> {
                       Container(
                         width: 100,
                         height: 120,
-                        // decoration: BoxDecoration(
-                        //   image: DecorationImage(
-                        //     image: NetworkImage(teacher['ProfilePicURL'] ?? ''),
-                        //     fit: BoxFit.cover,
-                        //   ),
-                        // ),
                         child: ImageNetwork(
                           image: teacher['ProfilePicURL'] ?? '',
                           height: 120,
@@ -955,80 +1163,99 @@ class _CourseDetailsState extends State<CourseDetails> {
         const SizedBox(height: 20),
 
         // Browse All Subjects Card
-        InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder:
-                    (context) => CourseMaterials(courseName: widget.coursename),
-              ),
-            );
-          },
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  ColorManager.primary.withOpacity(0.8),
-                  ColorManager.primary,
-                ],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.book, color: Colors.white, size: 36),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Browse All Subjects',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'View all course subjects and materials',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white.withOpacity(0.9),
-                        ),
-                      ),
+        _isEnrolled
+            ? InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) =>
+                            CourseMaterials(courseName: widget.coursename),
+                  ),
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      ColorManager.primary.withOpacity(0.8),
+                      ColorManager.primary,
                     ],
                   ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward,
-                    color: ColorManager.primary,
-                    size: 20,
-                  ),
+                child: Row(
+                  children: [
+                    Icon(Icons.book, color: Colors.white, size: 36),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Browse All Subjects',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'View all course subjects and materials',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.arrow_forward,
+                        color: ColorManager.primary,
+                        size: 20,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
+            )
+            : Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.lock, color: Colors.grey.shade600),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Enroll to access all subjects',
+                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
 
         // Key Documents Section
         Text(
@@ -1195,7 +1422,7 @@ class _CourseDetailsState extends State<CourseDetails> {
     );
   }
 
-  Widget _buildEnrollSection(Size size) {
+  Widget _buildEnrollSection(Size size, double price) {
     return Container(
       margin: const EdgeInsets.only(bottom: 32),
       padding: const EdgeInsets.all(24),
@@ -1247,7 +1474,10 @@ class _CourseDetailsState extends State<CourseDetails> {
             width: size.width * 0.7,
             height: 56,
             child: ElevatedButton(
-              onPressed: _handleEnrollment,
+              onPressed:
+                  _isEnrolled || _isProcessingPayment
+                      ? null
+                      : () => _handleEnrollment(price),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: ColorManager.primary,
@@ -1255,20 +1485,73 @@ class _CourseDetailsState extends State<CourseDetails> {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 elevation: 0,
+                disabledBackgroundColor: Colors.grey.shade300,
               ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              child:
+                  _isProcessingPayment
+                      ? const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(),
+                          ),
+                          SizedBox(width: 12),
+                          Text(
+                            'PROCESSING...',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      )
+                      : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            price > 0 ? Icons.payment : Icons.school,
+                            size: 24,
+                          ),
+                          SizedBox(width: 12),
+                          Text(
+                            price > 0
+                                ? 'PAY ₹${price.toStringAsFixed(2)} & ENROLL'
+                                : 'ENROLL NOW',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+            ),
+          ),
+          if (_isEnrolled)
+            Container(
+              margin: const EdgeInsets.only(top: 16),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.green.shade300),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.school, size: 24),
-                  SizedBox(width: 12),
+                  Icon(Icons.check_circle, color: Colors.green, size: 20),
+                  SizedBox(width: 8),
                   Text(
-                    'ENROLL NOW',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    'Already Enrolled',
+                    style: TextStyle(
+                      color: Colors.green.shade800,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
         ],
       ),
     );
@@ -1297,7 +1580,6 @@ class _CourseDetailsState extends State<CourseDetails> {
   }
 
   void _openPdf(String url) {
-    // Implementation for opening PDF
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('Opening PDF document...'),
@@ -1305,52 +1587,6 @@ class _CourseDetailsState extends State<CourseDetails> {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
-    );
-    // Add your PDF opening logic here
-  }
-
-  void _handleEnrollment() async {
-    // Show loading indicator
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
-    // Simulate enrollment process
-    await Future.delayed(const Duration(seconds: 2));
-
-    // Close loading indicator
-    Navigator.of(context).pop();
-
-    // Show success message
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Row(
-              children: [
-                Icon(Icons.check_circle, color: ColorManager.primary),
-                const SizedBox(width: 8),
-                const Text('Enrollment Successful'),
-              ],
-            ),
-            content: const Text(
-              'You have successfully enrolled in this course. You can now access all course materials.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(
-                  'OK',
-                  style: TextStyle(color: ColorManager.primary),
-                ),
-              ),
-            ],
-          ),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:luyip_website_edu/home/admin_dashboard.dart';
 import 'package:luyip_website_edu/home/franchise_dashboard.dart';
 import 'package:luyip_website_edu/home/student_dashboard.dart';
 import 'package:luyip_website_edu/home/teacher_dashboard.dart';
+import 'package:luyip_website_edu/student_dashboard/student_dashboard.dart';
 
 class MainPage extends StatelessWidget {
   final String role;
@@ -16,7 +17,7 @@ class MainPage extends StatelessWidget {
     // Redirect based on role
     switch (role) {
       case 'student':
-        return const StudentDashboard();
+        return const StudentDashboardContainer();
       case 'teacher':
         return const TeacherDashboard();
       case 'franchise':
@@ -24,7 +25,7 @@ class MainPage extends StatelessWidget {
       case 'admin':
         return const AdminDashboardContainer();
       default:
-        return const StudentDashboard(); // Default fallback
+        return const StudentDashboardContainer(); // Default fallback
     }
   }
 }

@@ -10,6 +10,7 @@ import 'package:luyip_website_edu/home/admin_dashboard.dart';
 import 'package:luyip_website_edu/home/franchise_dashboard.dart';
 import 'package:luyip_website_edu/home/student_dashboard.dart';
 import 'package:luyip_website_edu/home/teacher_dashboard.dart';
+import 'package:luyip_website_edu/student_dashboard/student_dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -110,7 +111,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     // User is logged in, redirect based on role
     switch (userRole) {
       case 'student':
-        return const StudentDashboard();
+        return const StudentDashboardContainer();
       case 'teacher':
         return const TeacherDashboard();
       case 'franchise':
