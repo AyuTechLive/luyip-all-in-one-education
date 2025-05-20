@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:luyip_website_edu/Membership/membership_screen.dart';
+import 'package:luyip_website_edu/Membership/membership_service.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
@@ -15,22 +17,53 @@ class StudentIDCardScreen extends StatefulWidget {
 class _StudentIDCardScreenState extends State<StudentIDCardScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final MembershipService _membershipService = MembershipService();
   bool isLoading = true;
   Map<String, dynamic>? studentData;
   String? errorMessage;
+  bool isMember = false;
+  DateTime? membershipExpiryDate;
+  String? membershipId;
 
   @override
   void initState() {
     super.initState();
-    fetchStudentData();
+    _checkMembershipAndFetchData();
   }
 
-  Future<void> fetchStudentData() async {
+  Future<void> _checkMembershipAndFetchData() async {
     setState(() {
       isLoading = true;
       errorMessage = null;
     });
 
+    try {
+      // First check membership status
+      final membershipStatus = await _membershipService.getMembershipStatus();
+
+      isMember = membershipStatus['isMember'] ?? false;
+      membershipExpiryDate = membershipStatus['expiryDate'];
+      membershipId = membershipStatus['membershipId'];
+
+      if (!isMember) {
+        setState(() {
+          isLoading = false;
+          errorMessage = "Membership required to access ID card";
+        });
+        return;
+      }
+
+      // If member, proceed to fetch student data
+      await fetchStudentData();
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        errorMessage = e.toString();
+      });
+    }
+  }
+
+  Future<void> fetchStudentData() async {
     try {
       User? currentUser = _auth.currentUser;
       if (currentUser == null) {
@@ -38,23 +71,18 @@ class _StudentIDCardScreenState extends State<StudentIDCardScreen> {
       }
 
       // Fetch student data from Firestore
-      QuerySnapshot querySnapshot =
-          await _firestore
-              .collection('Users')
-              .doc('student')
-              .collection('accounts')
-              .where('UID', isEqualTo: currentUser.uid)
-              .limit(1)
-              .get();
+      DocumentSnapshot userDoc = await _firestore
+          .collection('Users')
+          .doc('student')
+          .collection('accounts')
+          .doc(currentUser.email)
+          .get();
 
-      if (querySnapshot.docs.isEmpty) {
+      if (!userDoc.exists) {
         throw Exception("Student data not found");
       }
 
-      // Get the first document
-      DocumentSnapshot documentSnapshot = querySnapshot.docs.first;
-      Map<String, dynamic> data =
-          documentSnapshot.data() as Map<String, dynamic>;
+      Map<String, dynamic> data = userDoc.data() as Map<String, dynamic>;
 
       setState(() {
         studentData = data;
@@ -80,64 +108,82 @@ class _StudentIDCardScreenState extends State<StudentIDCardScreen> {
         ),
         elevation: 0,
       ),
-      body:
-          isLoading
-              ? const Center(
-                child: CircularProgressIndicator(color: ColorManager.primary),
-              )
-              : errorMessage != null
-              ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 60,
-                      color: ColorManager.error,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Error loading ID card',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: ColorManager.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      errorMessage!,
-                      style: TextStyle(color: ColorManager.textMedium),
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: fetchStudentData,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ColorManager.primary,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                      ),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              )
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: ColorManager.primary),
+            )
+          : errorMessage != null
+              ? _buildMembershipRequiredState()
               : buildIDCard(),
     );
   }
 
+  Widget _buildMembershipRequiredState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.card_membership,
+            size: 80,
+            color: ColorManager.primary.withOpacity(0.7),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Membership Required',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: ColorManager.textDark,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              errorMessage ??
+                  'You need an active membership to access your student ID card',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: ColorManager.textMedium,
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (context) => MembershipScreen()));
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ColorManager.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            icon: const Icon(Icons.arrow_back),
+            label: const Text('Go Back'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget buildIDCard() {
-    // Generate a student ID number based on DOJ and UID
-    String doj = studentData!['DOJ'] ?? '';
-    String uid = studentData!['UID'] ?? '';
-    String studentId = 'LYP-${doj.replaceAll('-', '')}-${uid.substring(0, 4)}';
+    // Generate a student ID number based on membership ID or DOJ and UID
+    String studentId = membershipId ?? '';
+    if (studentId.isEmpty) {
+      String doj = studentData!['DOJ'] ?? '';
+      String uid = studentData!['UID'] ?? '';
+      studentId = 'LYP-${doj.replaceAll('-', '')}-${uid.substring(0, 4)}';
+    }
 
     // Format the date of joining
     String formattedDoj = '';
     try {
-      List<String> dateParts = doj.split('-');
+      List<String> dateParts = studentData!['DOJ'].split('-');
       if (dateParts.length == 3) {
         DateTime dateObj = DateTime(
           int.parse(dateParts[2]),
@@ -146,27 +192,16 @@ class _StudentIDCardScreenState extends State<StudentIDCardScreen> {
         );
         formattedDoj = DateFormat('dd MMM yyyy').format(dateObj);
       } else {
-        formattedDoj = doj;
+        formattedDoj = studentData!['DOJ'];
       }
     } catch (e) {
-      formattedDoj = doj;
+      formattedDoj = studentData!['DOJ'] ?? 'N/A';
     }
 
-    // Calculate expiry date (1 year from date of joining)
-    String expiryDate = '';
-    try {
-      List<String> dateParts = doj.split('-');
-      if (dateParts.length == 3) {
-        DateTime dateObj = DateTime(
-          int.parse(dateParts[2]),
-          int.parse(dateParts[1]),
-          int.parse(dateParts[0]),
-        );
-        DateTime expiryDateObj = dateObj.add(const Duration(days: 365));
-        expiryDate = DateFormat('dd MMM yyyy').format(expiryDateObj);
-      }
-    } catch (e) {
-      expiryDate = 'N/A';
+    // Get formatted membership expiry date
+    String expiryDate = 'N/A';
+    if (membershipExpiryDate != null) {
+      expiryDate = DateFormat('dd MMM yyyy').format(membershipExpiryDate!);
     }
 
     return Center(
@@ -294,7 +329,7 @@ class _StudentIDCardScreenState extends State<StudentIDCardScreen> {
                                 studentData!['Email'] ?? 'N/A',
                               ),
                               detailRow('Joined', formattedDoj),
-                              detailRow('Expires', expiryDate),
+                              detailRow('Valid Until', expiryDate),
                             ],
                           ),
                         ),
@@ -302,11 +337,41 @@ class _StudentIDCardScreenState extends State<StudentIDCardScreen> {
                     ),
                   ),
 
+                  // Membership Badge
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.shade300),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.verified, color: Colors.green, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Premium Member',
+                          style: TextStyle(
+                            color: Colors.green.shade800,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   // Divider
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: ColorManager.dividerColor,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: ColorManager.dividerColor,
+                    ),
                   ),
 
                   // QR Code
@@ -316,7 +381,7 @@ class _StudentIDCardScreenState extends State<StudentIDCardScreen> {
                       child: Column(
                         children: [
                           QrImageView(
-                            data: 'LUYIP-STUDENT-${studentData!['UID']}',
+                            data: 'LUYIP-MEMBER-${studentData!['UID']}',
                             version: QrVersions.auto,
                             size: 120,
                             backgroundColor: Colors.white,

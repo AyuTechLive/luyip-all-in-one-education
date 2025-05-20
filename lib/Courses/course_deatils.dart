@@ -5,10 +5,14 @@ import 'package:luyip_website_edu/Courses/course_materials.dart';
 import 'package:luyip_website_edu/Courses/mark_course_complete.dart';
 import 'package:luyip_website_edu/Courses/transaction_service.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
+import 'package:luyip_website_edu/helpers/utils.dart';
 import 'package:razorpay_web/razorpay_web.dart';
+import 'package:intl/intl.dart';
 
 import '../helpers/userauthtype.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:luyip_website_edu/membership/membership_service.dart';
+import 'package:luyip_website_edu/membership/membership_screen.dart';
 
 class CourseDetails extends StatefulWidget {
   final String coursename;
@@ -29,9 +33,18 @@ class _CourseDetailsState extends State<CourseDetails> {
   bool _isEnrolled = false;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final MembershipService _membershipService = MembershipService();
   late Razorpay _razorpay;
   bool _isProcessingPayment = false;
   final TransactionService _transactionService = TransactionService();
+
+  // Membership related states
+  bool _isMember = false;
+  double _discountedPrice = 0.0;
+  double _originalPrice = 0.0;
+  double _discountPercentage = 0.0;
+  bool _isLoadingMembership = true;
+
   @override
   void initState() {
     super.initState();
@@ -48,6 +61,7 @@ class _CourseDetailsState extends State<CourseDetails> {
     _initializeRazorpay();
 
     _checkEnrollmentStatus();
+    _checkMembershipStatus();
   }
 
   void _initializeRazorpay() {
@@ -55,6 +69,59 @@ class _CourseDetailsState extends State<CourseDetails> {
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  }
+
+  Future<void> _checkMembershipStatus() async {
+    try {
+      // Get membership status
+      final membershipStatus = await _membershipService.getMembershipStatus();
+
+      // Get course info to check discount percentage
+      final courseDoc = await _firestore
+          .collection('All Courses')
+          .doc(widget.coursename)
+          .get();
+
+      if (!courseDoc.exists) {
+        setState(() {
+          _isLoadingMembership = false;
+        });
+        return;
+      }
+
+      // Get course price and discount
+      Map<String, dynamic> courseData =
+          courseDoc.data() as Map<String, dynamic>;
+      String priceStr = courseData['Course Price'] ?? '0';
+
+      // Remove currency symbol and convert to double
+      _originalPrice =
+          double.tryParse(priceStr.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+
+      // Get membership discount percentage
+      String discountStr = courseData['Membership Discount'] ?? '0';
+      _discountPercentage = double.tryParse(discountStr) ?? 0.0;
+
+      // Calculate discounted price if member
+      bool isMember = membershipStatus['isMember'] ?? false;
+
+      if (isMember && _discountPercentage > 0) {
+        double discountAmount = _originalPrice * (_discountPercentage / 100);
+        _discountedPrice = _originalPrice - discountAmount;
+      } else {
+        _discountedPrice = _originalPrice;
+      }
+
+      setState(() {
+        _isMember = isMember;
+        _isLoadingMembership = false;
+      });
+    } catch (e) {
+      print("Error checking membership status: $e");
+      setState(() {
+        _isLoadingMembership = false;
+      });
+    }
   }
 
   Widget _buildCourseCompletionButton() {
@@ -139,22 +206,12 @@ class _CourseDetailsState extends State<CourseDetails> {
     });
 
     try {
-      // Get course price from Firestore
-      final courseDoc = await _firestore
-          .collection('All Courses')
-          .doc(widget.coursename)
-          .get();
-
-      String priceStr =
-          (courseDoc.data() as Map<String, dynamic>)['Course Price'] ?? '0';
-      // Remove currency symbol and convert to double
-      double amount =
-          double.tryParse(priceStr.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
-
-      // Complete the enrollment process
+      // Complete the enrollment process with the appropriate price
       await _transactionService.completeEnrollment(
         transactionId: response.paymentId!,
-        amount: amount,
+        amount: _isMember && _discountPercentage > 0
+            ? _discountedPrice
+            : _originalPrice,
         courseName: widget.coursename,
         currency: 'INR',
       );
@@ -248,14 +305,17 @@ class _CourseDetailsState extends State<CourseDetails> {
         );
       }
     } else {
-      // If course has a price, start payment flow
-      _startPayment(price, widget.coursename);
+      // If course has a price, start payment flow with appropriate price
+      double finalPrice =
+          _isMember && _discountPercentage > 0 ? _discountedPrice : price;
+      _startPayment(finalPrice, widget.coursename);
     }
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _razorpay.clear();
     super.dispose();
   }
 
@@ -286,6 +346,10 @@ class _CourseDetailsState extends State<CourseDetails> {
           var data = snapshot.data!.data() as Map<String, dynamic>;
           List teachers = data['Teachers'] ?? [];
           List notices = data['Notices'] ?? [];
+          List<dynamic> keyDocuments = data['KeyDocuments'] ?? [];
+          List<dynamic> learningObjectives = data['LearningObjectives'] ?? [];
+          List<dynamic> featureCards = data['FeatureCards'] ?? [];
+          String scheduleDocumentUrl = data['SchedulePDF'] ?? '';
 
           // Parse course price
           String priceStr = data['Course Price'] ?? 'FREE';
@@ -315,7 +379,16 @@ class _CourseDetailsState extends State<CourseDetails> {
                   children: [
                     _buildTabBar(),
                     const SizedBox(height: 16),
-                    _buildTabContent(data, teachers, notices, size, price),
+                    _buildTabContent(
+                        data,
+                        teachers,
+                        notices,
+                        size,
+                        price,
+                        learningObjectives,
+                        featureCards,
+                        keyDocuments,
+                        scheduleDocumentUrl),
                   ],
                 ),
               ),
@@ -347,11 +420,20 @@ class _CourseDetailsState extends State<CourseDetails> {
                         0.0;
                   }
 
+                  double finalPrice = _isMember && _discountPercentage > 0
+                      ? _discountedPrice
+                      : price;
+                  String buttonText = price > 0
+                      ? finalPrice < price
+                          ? 'PAY ₹${finalPrice.toStringAsFixed(0)} & ENROLL'
+                          : 'PAY & ENROLL'
+                      : 'ENROLL NOW';
+
                   return FloatingActionButton.extended(
                     onPressed: () => _handleEnrollment(price),
                     backgroundColor: ColorManager.primary,
                     label: Text(
-                      price > 0 ? 'PAY & ENROLL' : 'ENROLL NOW',
+                      buttonText,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     icon: price > 0
@@ -438,6 +520,10 @@ class _CourseDetailsState extends State<CourseDetails> {
     List notices,
     Size size,
     double price,
+    List<dynamic> learningObjectives,
+    List<dynamic> featureCards,
+    List<dynamic> keyDocuments,
+    String scheduleDocumentUrl,
   ) {
     switch (_activeTab) {
       case 0:
@@ -446,9 +532,9 @@ class _CourseDetailsState extends State<CourseDetails> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildCourseInfo(data),
+              _buildCourseInfo(data, learningObjectives),
               const SizedBox(height: 24),
-              _buildFeatureCards(data),
+              _buildFeatureCards(featureCards),
               const SizedBox(height: 40),
               _buildEnrollSection(size, price),
             ],
@@ -462,12 +548,12 @@ class _CourseDetailsState extends State<CourseDetails> {
       case 2:
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _buildCourseTimeline(notices),
+          child: _buildCourseTimeline(notices, scheduleDocumentUrl),
         );
       case 3:
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _buildMaterialsSection(data),
+          child: _buildMaterialsSection(data, keyDocuments),
         );
       default:
         return Container();
@@ -649,13 +735,70 @@ class _CourseDetailsState extends State<CourseDetails> {
                         style: const TextStyle(color: Colors.white),
                       ),
                       const Spacer(),
-                      Text(
-                        data['Course Price'] ?? 'FREE',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (_isLoadingMembership)
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          else if (_isMember && _discountPercentage > 0)
+                            Row(
+                              children: [
+                                Text(
+                                  data['Course Price'] ?? 'FREE',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    decoration: TextDecoration.lineThrough,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '₹${_discountedPrice.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            )
+                          else
+                            Text(
+                              data['Course Price'] ?? 'FREE',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          if (_isMember && _discountPercentage > 0)
+                            Container(
+                              margin: const EdgeInsets.only(top: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                'Member Discount: ${_discountPercentage.toStringAsFixed(0)}% Off',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),
@@ -704,7 +847,8 @@ class _CourseDetailsState extends State<CourseDetails> {
     );
   }
 
-  Widget _buildCourseInfo(Map<String, dynamic> data) {
+  Widget _buildCourseInfo(
+      Map<String, dynamic> data, List<dynamic> learningObjectives) {
     return Container(
       margin: const EdgeInsets.only(top: 16),
       child: Column(
@@ -730,7 +874,7 @@ class _CourseDetailsState extends State<CourseDetails> {
           const SizedBox(height: 16),
           Text(
             data['Course Discription'] ??
-                'This course is designed to help students master key concepts through interactive lessons, mentorship, and real-world applications.',
+                'This course is designed to help students master key concepts through interactive lessons and real-world applications.',
             style: TextStyle(
               fontSize: 16,
               color: ColorManager.textMedium,
@@ -738,6 +882,80 @@ class _CourseDetailsState extends State<CourseDetails> {
             ),
           ),
           const SizedBox(height: 20),
+
+          // Membership discount card
+          if (_discountPercentage > 0) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _isMember
+                    ? Colors.green.withOpacity(0.1)
+                    : ColorManager.primaryLight.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _isMember
+                      ? Colors.green.shade300
+                      : ColorManager.primary.withOpacity(0.3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.card_membership,
+                        color: _isMember ? Colors.green : ColorManager.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Membership Benefit',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: _isMember
+                              ? Colors.green.shade800
+                              : ColorManager.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _isMember
+                        ? 'Your membership gives you ${_discountPercentage.toStringAsFixed(0)}% off this course!'
+                        : 'Members get ${_discountPercentage.toStringAsFixed(0)}% off this course! Join our membership program to save.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: ColorManager.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (!_isMember)
+                    OutlinedButton(
+                      onPressed: () {
+                        // Navigate to membership screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const MembershipScreen(),
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: ColorManager.primary,
+                        side: BorderSide(color: ColorManager.primary),
+                      ),
+                      child: const Text('Learn more about membership'),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -766,7 +984,7 @@ class _CourseDetailsState extends State<CourseDetails> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: _buildLearningObjectives(data),
+                  children: _buildLearningObjectives(learningObjectives),
                 ),
               ],
             ),
@@ -776,15 +994,18 @@ class _CourseDetailsState extends State<CourseDetails> {
     );
   }
 
-  List<Widget> _buildLearningObjectives(Map<String, dynamic> data) {
-    final List<String> objectives = [
-      'Master fundamental concepts',
-      'Solve real-world problems',
-      'Learn from industry experts',
-      'Receive personalized feedback',
-      'Join a community of learners',
-      'Earn a recognized certificate',
-    ];
+  List<Widget> _buildLearningObjectives(List<dynamic> objectives) {
+    // If no objectives are provided, display default ones
+    if (objectives.isEmpty) {
+      objectives = [
+        'Master fundamental concepts',
+        'Solve real-world problems',
+        'Learn from industry experts',
+        'Receive personalized feedback',
+        'Join a community of learners',
+        'Earn a recognized certificate',
+      ];
+    }
 
     return objectives.map((objective) {
       return Row(
@@ -803,7 +1024,7 @@ class _CourseDetailsState extends State<CourseDetails> {
           const SizedBox(width: 8),
           Flexible(
             child: Text(
-              objective,
+              objective.toString(),
               style: TextStyle(fontSize: 14, color: ColorManager.textMedium),
             ),
           ),
@@ -812,47 +1033,105 @@ class _CourseDetailsState extends State<CourseDetails> {
     }).toList();
   }
 
-  Widget _buildFeatureCards(Map<String, dynamic> data) {
-    final features = [
-      {
-        'icon': Icons.video_library,
-        'title': 'Video Lectures',
-        'description': 'HD video content with interactive elements',
-        'color': Colors.blue,
-      },
-      {
-        'icon': Icons.people,
-        'title': 'Expert Support',
-        'description': 'Get help from teachers and peers',
-        'color': Colors.green,
-      },
-      {
-        'icon': Icons.assignment,
-        'title': 'Assignments',
-        'description': 'Practice with real-world exercises',
-        'color': Colors.orange,
-      },
-      {
-        'icon': Icons.school,
-        'title': 'Certification',
-        'description': 'Earn a recognized certificate',
-        'color': Colors.purple,
-      },
-    ];
+  Widget _buildFeatureCards(List<dynamic> featureCards) {
+    // If no feature cards are provided, display default ones
+    if (featureCards.isEmpty) {
+      featureCards = [
+        {
+          'icon': 'video_library',
+          'title': 'Video Lectures',
+          'description': 'HD video content with interactive elements',
+          'color': 'blue',
+        },
+        {
+          'icon': 'people',
+          'title': 'Expert Support',
+          'description': 'Get help from teachers and peers',
+          'color': 'green',
+        },
+        {
+          'icon': 'assignment',
+          'title': 'Assignments',
+          'description': 'Practice with real-world exercises',
+          'color': 'orange',
+        },
+        {
+          'icon': 'school',
+          'title': 'Certification',
+          'description': 'Earn a recognized certificate',
+          'color': 'purple',
+        },
+      ];
+    }
 
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
       shrinkWrap: true,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 4,
+        childAspectRatio: 1.6,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
-      itemCount: features.length,
+      itemCount: featureCards.length,
       itemBuilder: (context, index) {
-        final feature = features[index];
-        final color = feature['color'] as Color;
+        final feature = featureCards[index];
+
+        // Convert string icon name to IconData
+        IconData iconData;
+        switch (feature['icon'].toString()) {
+          case 'video_library':
+            iconData = Icons.video_library;
+            break;
+          case 'people':
+            iconData = Icons.people;
+            break;
+          case 'assignment':
+            iconData = Icons.assignment;
+            break;
+          case 'school':
+            iconData = Icons.school;
+            break;
+          case 'star':
+            iconData = Icons.star;
+            break;
+          case 'devices':
+            iconData = Icons.devices;
+            break;
+          case 'support':
+            iconData = Icons.support_agent;
+            break;
+          case 'chat':
+            iconData = Icons.chat;
+            break;
+          default:
+            iconData = Icons.info;
+        }
+
+        // Convert string color to Color
+        Color color;
+        switch (feature['color'].toString()) {
+          case 'blue':
+            color = Colors.blue;
+            break;
+          case 'green':
+            color = Colors.green;
+            break;
+          case 'orange':
+            color = Colors.orange;
+            break;
+          case 'purple':
+            color = Colors.purple;
+            break;
+          case 'red':
+            color = Colors.red;
+            break;
+          case 'teal':
+            color = Colors.teal;
+            break;
+          default:
+            color = ColorManager.primary;
+        }
 
         return Container(
           decoration: BoxDecoration(
@@ -876,14 +1155,14 @@ class _CourseDetailsState extends State<CourseDetails> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
-                    feature['icon'] as IconData,
+                    iconData,
                     color: color,
                     size: 24,
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  feature['title'] as String,
+                  feature['title'].toString(),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -892,11 +1171,13 @@ class _CourseDetailsState extends State<CourseDetails> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  feature['description'] as String,
+                  feature['description'].toString(),
                   style: TextStyle(
                     fontSize: 12,
                     color: ColorManager.textMedium,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -965,6 +1246,18 @@ class _CourseDetailsState extends State<CourseDetails> {
                           image: teacher['ProfilePicURL'] ?? '',
                           height: 120,
                           width: 100,
+                          fitAndroidIos: BoxFit.cover,
+                          onLoading: Center(
+                            child: CircularProgressIndicator(
+                              color: ColorManager.primary,
+                              strokeWidth: 2,
+                            ),
+                          ),
+                          onError: Icon(
+                            Icons.person,
+                            size: 60,
+                            color: ColorManager.primary.withOpacity(0.5),
+                          ),
                         ),
                       ),
                       Expanded(
@@ -991,13 +1284,12 @@ class _CourseDetailsState extends State<CourseDetails> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: ColorManager.primary.withOpacity(
-                                        0.1,
-                                      ),
+                                      color:
+                                          ColorManager.primary.withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
-                                      teacher['Subjects'] ?? '',
+                                      teacher['Subject'] ?? '',
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
@@ -1064,7 +1356,7 @@ class _CourseDetailsState extends State<CourseDetails> {
     );
   }
 
-  Widget _buildCourseTimeline(List notices) {
+  Widget _buildCourseTimeline(List notices, String scheduleDocumentUrl) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1086,6 +1378,68 @@ class _CourseDetailsState extends State<CourseDetails> {
           ),
         ),
         const SizedBox(height: 20),
+
+        // Schedule PDF document card
+        if (scheduleDocumentUrl.isNotEmpty)
+          Container(
+            margin: EdgeInsets.only(bottom: 24),
+            child: InkWell(
+              onTap: () => _openPdf(scheduleDocumentUrl),
+              child: Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: ColorManager.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: ColorManager.primary.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.calendar_month,
+                        color: ColorManager.primary, size: 40),
+                    SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Detailed Schedule',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: ColorManager.textDark,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'View the complete course timetable, including class dates, times, and topics',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: ColorManager.textMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: ColorManager.primary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.file_download,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
         if (notices.isEmpty)
           _buildEmptyState(
             'No schedule available yet',
@@ -1166,7 +1520,8 @@ class _CourseDetailsState extends State<CourseDetails> {
     );
   }
 
-  Widget _buildMaterialsSection(Map<String, dynamic> data) {
+  Widget _buildMaterialsSection(
+      Map<String, dynamic> data, List<dynamic> keyDocuments) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1295,7 +1650,8 @@ class _CourseDetailsState extends State<CourseDetails> {
         ),
         const SizedBox(height: 16),
 
-        if ((data['SyllabusPDF'] == null || data['SyllabusPDF'].isEmpty) &&
+        if (keyDocuments.isEmpty &&
+            (data['SyllabusPDF'] == null || data['SyllabusPDF'].isEmpty) &&
             (data['PreviewPDF'] == null || data['PreviewPDF'].isEmpty))
           _buildEmptyState(
             'No materials available yet',
@@ -1335,10 +1691,37 @@ class _CourseDetailsState extends State<CourseDetails> {
                   Icons.library_books,
                   () => _openPdf(data['ReferencesPDF']),
                 ),
+
+              // Display dynamic key documents from Firebase
+              ...keyDocuments.map((document) {
+                return _buildMaterialCard(
+                  document['title'] ?? 'Document',
+                  document['description'] ?? 'Course document',
+                  _getIconForDocType(document['type'] ?? 'document'),
+                  () => _openPdf(document['url'] ?? ''),
+                );
+              }).toList(),
             ],
           ),
       ],
     );
+  }
+
+  IconData _getIconForDocType(String type) {
+    switch (type.toLowerCase()) {
+      case 'syllabus':
+        return Icons.menu_book;
+      case 'worksheet':
+        return Icons.assignment;
+      case 'reference':
+        return Icons.library_books;
+      case 'lecture':
+        return Icons.school;
+      case 'preview':
+        return Icons.visibility;
+      default:
+        return Icons.insert_drive_file;
+    }
   }
 
   Widget _buildEmptyState(String title, String subtitle, IconData icon) {
@@ -1450,6 +1833,9 @@ class _CourseDetailsState extends State<CourseDetails> {
   }
 
   Widget _buildEnrollSection(Size size, double price) {
+    double finalPrice =
+        _isMember && _discountPercentage > 0 ? _discountedPrice : price;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 32),
       padding: const EdgeInsets.all(24),
@@ -1496,6 +1882,68 @@ class _CourseDetailsState extends State<CourseDetails> {
               _buildEnrollmentStat('24/7', 'Support'),
             ],
           ),
+
+          // Membership offer section
+          if (_discountPercentage > 0 && !_isMember) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.card_membership, color: Colors.white, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Save ${_discountPercentage.toStringAsFixed(0)}% with Membership!',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Join for ₹1000/year and get exclusive discounts on all courses',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MembershipScreen(),
+                        ),
+                      );
+                    },
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: ColorManager.primary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                    ),
+                    child: const Text('JOIN'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           const SizedBox(height: 24),
           SizedBox(
             width: size.width * 0.7,
@@ -1542,7 +1990,7 @@ class _CourseDetailsState extends State<CourseDetails> {
                         SizedBox(width: 12),
                         Text(
                           price > 0
-                              ? 'PAY ₹${price.toStringAsFixed(2)} & ENROLL'
+                              ? 'PAY ₹${finalPrice.toStringAsFixed(0)} & ENROLL'
                               : 'ENROLL NOW',
                           style: TextStyle(
                             fontSize: 18,
@@ -1613,5 +2061,6 @@ class _CourseDetailsState extends State<CourseDetails> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
+    // Implement PDF opening logic here
   }
 }

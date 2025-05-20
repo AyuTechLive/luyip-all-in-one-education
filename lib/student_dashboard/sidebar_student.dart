@@ -1,8 +1,10 @@
-// Student sidebar implementation with light color theme
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:luyip_website_edu/auth/auth_service.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
 
-class StudentSidebar extends StatelessWidget {
+class StudentSidebar extends StatefulWidget {
   final String selectedPage;
   final Function(String) onPageChanged;
 
@@ -11,6 +13,78 @@ class StudentSidebar extends StatelessWidget {
     required this.selectedPage,
     required this.onPageChanged,
   }) : super(key: key);
+
+  @override
+  State<StudentSidebar> createState() => _StudentSidebarState();
+}
+
+class _StudentSidebarState extends State<StudentSidebar> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  String _studentName = "Loading...";
+  String _studentEmail = "";
+  bool _isLoading = true;
+  String _studentInitial = "?";
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserData();
+  }
+
+  Future<void> _fetchUserData() async {
+    try {
+      User? currentUser = _auth.currentUser;
+      if (currentUser != null) {
+        // Get the email
+        setState(() {
+          _studentEmail = currentUser.email ?? "";
+        });
+
+        // If display name exists in auth user, use it
+        if (currentUser.displayName != null &&
+            currentUser.displayName!.isNotEmpty) {
+          setState(() {
+            _studentName = currentUser.displayName!;
+            _studentInitial = _studentName[0].toUpperCase();
+            _isLoading = false;
+          });
+        } else {
+          // Otherwise fetch from Firestore
+          final userDoc = await _firestore
+              .collection('Users')
+              .doc('student')
+              .collection('accounts')
+              .doc(currentUser.email)
+              .get();
+
+          if (userDoc.exists) {
+            final userData = userDoc.data();
+            if (userData != null && userData.containsKey('Name')) {
+              setState(() {
+                _studentName = userData['Name'];
+                _studentInitial = _studentName.isNotEmpty
+                    ? _studentName[0].toUpperCase()
+                    : "S";
+              });
+            }
+          }
+
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error fetching user data: $e');
+      setState(() {
+        _studentName = "Student";
+        _studentInitial = "S";
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,39 +135,51 @@ class StudentSidebar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: ColorManager.primaryLight,
-                    child: Text(
-                      "S",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: ColorManager.primaryDark,
-                      ),
-                    ),
-                  ),
+                  _isLoading
+                      ? const SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: CircularProgressIndicator(),
+                        )
+                      : CircleAvatar(
+                          radius: 24,
+                          backgroundColor: ColorManager.primaryLight,
+                          child: Text(
+                            _studentInitial,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: ColorManager.primaryDark,
+                            ),
+                          ),
+                        ),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Student Name",
-                        style: TextStyle(
-                          color: ColorManager.textDark,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isLoading ? "Loading..." : _studentName,
+                          style: TextStyle(
+                            color: ColorManager.textDark,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        "Computer Science",
-                        style: TextStyle(
-                          color: ColorManager.textMedium,
-                          fontSize: 12,
+                        const SizedBox(height: 2),
+                        Text(
+                          _isLoading ? "" : _studentEmail,
+                          style: TextStyle(
+                            color: ColorManager.textMedium,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -136,26 +222,26 @@ class StudentSidebar extends StatelessWidget {
                       context,
                       Icons.dashboard_outlined,
                       'Dashboard',
-                      isActive: selectedPage == 'Dashboard',
+                      isActive: widget.selectedPage == 'Dashboard',
                     ),
                     _buildSidebarItem(
                       context,
                       Icons.class_outlined,
                       'My Batches',
-                      isActive: selectedPage == 'My Batches',
+                      isActive: widget.selectedPage == 'My Batches',
                       badge: '3',
                     ),
                     _buildSidebarItem(
                       context,
                       Icons.menu_book_outlined,
                       'All Courses',
-                      isActive: selectedPage == 'All Courses',
+                      isActive: widget.selectedPage == 'All Courses',
                     ),
                     _buildSidebarItem(
                       context,
                       Icons.card_membership_outlined,
                       'Certificates',
-                      isActive: selectedPage == 'Certificates',
+                      isActive: widget.selectedPage == 'Certificates',
                       badge: '2',
                     ),
 
@@ -194,26 +280,26 @@ class StudentSidebar extends StatelessWidget {
                       context,
                       Icons.calendar_today_outlined,
                       'Schedule',
-                      isActive: selectedPage == 'Schedule',
+                      isActive: widget.selectedPage == 'Schedule',
                     ),
                     _buildSidebarItem(
                       context,
                       Icons.assignment_outlined,
                       'Assignments',
-                      isActive: selectedPage == 'Assignments',
+                      isActive: widget.selectedPage == 'Assignments',
                       badge: '4',
                     ),
                     _buildSidebarItem(
                       context,
                       Icons.library_books_outlined,
                       'Library',
-                      isActive: selectedPage == 'Library',
+                      isActive: widget.selectedPage == 'Library',
                     ),
                     _buildSidebarItem(
                       context,
                       Icons.workspace_premium_outlined,
                       'Take Membership',
-                      isActive: selectedPage == 'Take Membership',
+                      isActive: widget.selectedPage == 'Take Membership',
                       hasProTag: true,
                     ),
 
@@ -252,27 +338,27 @@ class StudentSidebar extends StatelessWidget {
                       context,
                       Icons.message_outlined,
                       'Messages',
-                      isActive: selectedPage == 'Messages',
+                      isActive: widget.selectedPage == 'Messages',
                       badge: '5',
                     ),
                     _buildSidebarItem(
                       context,
                       Icons.settings_outlined,
                       'Settings',
-                      isActive: selectedPage == 'Settings',
+                      isActive: widget.selectedPage == 'Settings',
                     ),
                   ],
                 ),
               ),
             ),
 
-            // Footer with logout button
+            // Footer with logout button - Updated with AuthService
             Container(
               padding: const EdgeInsets.all(16),
               child: GestureDetector(
                 onTap: () {
-                  // Handle logout logic here
-                  Navigator.pushReplacementNamed(context, '/login');
+                  // Show confirmation dialog before logout
+                  _showLogoutConfirmationDialog(context);
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -311,6 +397,40 @@ class StudentSidebar extends StatelessWidget {
     );
   }
 
+  // Show confirmation dialog before logout
+  void _showLogoutConfirmationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: ColorManager.textDark),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Call the logout method from AuthService
+              AuthService().logout(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ColorManager.error,
+            ),
+            child: const Text(
+              'Logout',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSidebarItem(
     BuildContext context,
     IconData icon,
@@ -322,15 +442,14 @@ class StudentSidebar extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         // Use the callback to change the page
-        onPageChanged(label);
+        widget.onPageChanged(label);
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-          color:
-              isActive
-                  ? ColorManager.primary.withOpacity(0.1)
-                  : Colors.transparent,
+          color: isActive
+              ? ColorManager.primary.withOpacity(0.1)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -373,10 +492,9 @@ class StudentSidebar extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color:
-                      isActive
-                          ? ColorManager.primary
-                          : ColorManager.secondary.withOpacity(0.7),
+                  color: isActive
+                      ? ColorManager.primary
+                      : ColorManager.secondary.withOpacity(0.7),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -394,5 +512,3 @@ class StudentSidebar extends StatelessWidget {
     );
   }
 }
-
-// Student Dashboard Content

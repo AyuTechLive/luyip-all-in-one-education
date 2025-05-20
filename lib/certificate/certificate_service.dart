@@ -4,7 +4,6 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:luyip_website_edu/certificate/certificate_generator.dart';
 import 'package:luyip_website_edu/certificate/certificate_model.dart';
-// Import the fixed certificate generator
 import 'package:luyip_website_edu/helpers/utils.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -17,76 +16,59 @@ class CertificateService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Mark a course as complete for a student
-  Future<bool> markCourseAsComplete({
-    required String userId,
-    required String userEmail,
-    required String courseName,
-    required String completedBy,
-  }) async {
+  // Check if certificate is already issued
+  Future<Certificate?> getExistingCertificate(
+      String userId, String courseName) async {
     try {
-      // First, check if all tests or 80% of tests are passed
-      final testResults = await _getTestResults(userId, courseName);
-      final testPassPercentage = _calculateTestPassPercentage(testResults);
+      final certificateQuery = await _firestore
+          .collection('Certificates')
+          .where('userId', isEqualTo: userId)
+          .where('courseName', isEqualTo: courseName)
+          .where('status', isEqualTo: 'issued')
+          .limit(1)
+          .get();
 
-      print('Test pass percentage: $testPassPercentage'); // Debug log
-
-      // Create course completion record
-      final courseCompletion = CourseCompletion(
-        userId: userId,
-        courseName: courseName,
-        isCompleted: true,
-        completedDate: DateTime.now(),
-        completedBy: completedBy,
-        passedTestIds: testResults['passedTests'] ?? [],
-        testPassPercentage: testPassPercentage,
-        certificateIssued: false, // Will be updated if certificate is issued
-      );
-
-      // Save to Firestore
-      await _firestore
-          .collection('CourseCompletions')
-          .doc('${userId}_${courseName}')
-          .set(courseCompletion.toMap());
-
-      // Update user's course status
-      await _firestore
-          .collection('Users')
-          .doc(userEmail.split('@')[0])
-          .collection('accounts')
-          .doc(userEmail)
-          .update({
-        courseName: [2], // Assuming 2 is the status code for completed courses
-      });
-
-      // If test pass percentage is >= 80%, auto-generate certificate
-      if (testPassPercentage >= 80.0) {
-        print(
-            'Generating certificate for user: $userId, course: $courseName'); // Debug log
-        final certificate = await generateCertificate(
-          userId: userId,
-          userEmail: userEmail,
-          courseName: courseName,
-          percentageScore: testPassPercentage,
-        );
-
-        return certificate != null;
+      if (certificateQuery.docs.isEmpty) {
+        return null;
       }
 
-      return true;
+      return Certificate.fromDocSnapshot(certificateQuery.docs.first);
     } catch (e) {
-      print('Error marking course as complete: $e');
+      print('Error getting existing certificate: $e');
+      return null;
+    }
+  }
+
+  // Check if a course is marked as completed
+  Future<bool> isCourseCompleted(String courseName) async {
+    try {
+      final courseDoc =
+          await _firestore.collection('All Courses').doc(courseName).get();
+
+      return courseDoc.exists && (courseDoc.data()?['isCompleted'] ?? false);
+    } catch (e) {
+      print('Error checking if course is completed: $e');
       return false;
     }
   }
 
-  // Calculate what percentage of tests were passed
-  double _calculateTestPassPercentage(Map<String, dynamic> testResults) {
-    final List<String> passedTests = testResults['passedTests'] as List<String>;
-    final int totalTests = testResults['totalTests'] as int;
+  // Calculate what percentage of tests were passed by a student
+  Future<double> calculateTestPassPercentage(
+      String userId, String courseName) async {
+    try {
+      // Get test results for user in course
+      final testResults = await _getTestResults(userId, courseName);
 
-    if (totalTests == 0) return 0.0;
-    return (passedTests.length / totalTests) * 100;
+      final List<String> passedTests =
+          testResults['passedTests'] as List<String>;
+      final int totalTests = testResults['totalTests'] as int;
+
+      if (totalTests == 0) return 0.0;
+      return (passedTests.length / totalTests) * 100;
+    } catch (e) {
+      print('Error calculating test pass percentage: $e');
+      return 0.0;
+    }
   }
 
   // Get test results for a user in a course
@@ -154,15 +136,76 @@ class CertificateService {
     }
   }
 
+  // Check if a user is eligible for a certificate
+  Future<Map<String, dynamic>> checkCertificateEligibility(
+      String userId, String courseName) async {
+    try {
+      // First check if course is marked as completed
+      final isCourseCompleted = await this.isCourseCompleted(courseName);
+
+      // Then check if they've passed enough tests
+      final percentageScore =
+          await calculateTestPassPercentage(userId, courseName);
+
+      // Check if certificate already exists
+      final existingCertificate =
+          await getExistingCertificate(userId, courseName);
+
+      return {
+        'isCourseCompleted': isCourseCompleted,
+        'testPassPercentage': percentageScore,
+        'isEligible': isCourseCompleted &&
+            percentageScore >= 70.0 &&
+            existingCertificate == null,
+        'certificateIssued': existingCertificate != null,
+        'certificate': existingCertificate,
+      };
+    } catch (e) {
+      print('Error checking certificate eligibility: $e');
+      return {
+        'isCourseCompleted': false,
+        'testPassPercentage': 0.0,
+        'isEligible': false,
+        'certificateIssued': false,
+        'certificate': null,
+      };
+    }
+  }
+
   // Generate a certificate for a student
   Future<Certificate?> generateCertificate({
     required String userId,
     required String userEmail,
     required String courseName,
-    required double percentageScore,
   }) async {
     try {
       print('Starting certificate generation process...'); // Debug log
+
+      // Check if certificate already exists
+      final existingCertificate =
+          await getExistingCertificate(userId, courseName);
+      if (existingCertificate != null) {
+        // Certificate already exists, return it
+        return existingCertificate;
+      }
+
+      // Check if course is officially completed
+      final isCourseCompleted = await this.isCourseCompleted(courseName);
+
+      if (!isCourseCompleted) {
+        throw Exception(
+            'This course has not been marked as completed by an instructor yet');
+      }
+
+      // Calculate the student's test pass percentage
+      final percentageScore =
+          await calculateTestPassPercentage(userId, courseName);
+
+      // Check if student has passed at least 70% of tests
+      if (percentageScore < 70.0) {
+        throw Exception(
+            'You need to pass at least 70% of tests to generate a certificate');
+      }
 
       // Get user information
       final userDoc = await _firestore
@@ -214,11 +257,12 @@ class CertificateService {
       );
     } catch (e) {
       print('Error generating certificate: $e');
-      return null;
+      rethrow; // Rethrow to allow UI to display the specific error
     }
   }
 
   // Helper method to generate certificate once user name is determined
+// Helper method to generate certificate once user name is determined
   Future<Certificate?> _generateCertificateWithUserName({
     required String userId,
     required String userEmail,
@@ -230,7 +274,7 @@ class CertificateService {
       // Generate unique certificate number
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final certificateNumber =
-          'CERT-${courseName.substring(0, 3).toUpperCase()}-$userId-$timestamp';
+          'CERT-${courseName.substring(0, min(3, courseName.length)).toUpperCase()}-$userId-$timestamp';
 
       print('Generated certificate number: $certificateNumber'); // Debug log
 
@@ -268,24 +312,13 @@ class CertificateService {
         status: 'issued',
       );
 
-      // Save to Firestore
+      // Save to Firestore for verification purposes
       await _firestore
           .collection('Certificates')
           .doc(certificateNumber)
           .set(certificate.toMap());
 
       print('Saved certificate to Firestore'); // Debug log
-
-      // Update course completion record
-      await _firestore
-          .collection('CourseCompletions')
-          .doc('${userId}_${courseName}')
-          .update({
-        'certificateIssued': true,
-        'certificateId': certificateNumber,
-      });
-
-      print('Updated course completion record'); // Debug log
 
       // Add certificate to user's profile
       await _firestore
@@ -306,22 +339,8 @@ class CertificateService {
     }
   }
 
-  // Get all certificates for a user
-  Future<List<Certificate>> getUserCertificates(String userId) async {
-    try {
-      final certificatesSnapshot = await _firestore
-          .collection('Certificates')
-          .where('userId', isEqualTo: userId)
-          .where('status', isEqualTo: 'issued')
-          .get();
-
-      return certificatesSnapshot.docs
-          .map((doc) => Certificate.fromDocSnapshot(doc))
-          .toList();
-    } catch (e) {
-      print('Error getting user certificates: $e');
-      return [];
-    }
+  int min(int a, int b) {
+    return a < b ? a : b;
   }
 
   // Verify a certificate by certificate number
@@ -343,17 +362,21 @@ class CertificateService {
     }
   }
 
-  // Check if a user is eligible for a certificate
-  Future<bool> isEligibleForCertificate(
-      String userId, String courseName) async {
+  // Get all certificates for a user
+  Future<List<Certificate>> getUserCertificates(String userId) async {
     try {
-      final testResults = await _getTestResults(userId, courseName);
-      final testPassPercentage = _calculateTestPassPercentage(testResults);
+      final certificatesSnapshot = await _firestore
+          .collection('Certificates')
+          .where('userId', isEqualTo: userId)
+          .where('status', isEqualTo: 'issued')
+          .get();
 
-      return testPassPercentage >= 80.0;
+      return certificatesSnapshot.docs
+          .map((doc) => Certificate.fromDocSnapshot(doc))
+          .toList();
     } catch (e) {
-      print('Error checking certificate eligibility: $e');
-      return false;
+      print('Error getting user certificates: $e');
+      return [];
     }
   }
 }

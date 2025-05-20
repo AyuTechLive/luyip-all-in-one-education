@@ -462,7 +462,7 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
           context,
           MaterialPageRoute(
             builder: (context) => CourseDetails(
-              userRole: 'admin',
+              userRole: widget.userType,
               coursename: coursename,
               // courseprice: courseprice,
               // courseImage: courseimg,
@@ -482,7 +482,7 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
         context,
         MaterialPageRoute(
           builder: (context) => CourseDetails(
-            userRole: 'admin',
+            userRole: widget.userType,
             coursename: coursename,
             // courseprice: courseprice,
             // courseImage: courseimg,

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:luyip_website_edu/auth/signp.dart';
-import 'package:luyip_website_edu/helpers/roundbutton.dart';
+import 'package:luyip_website_edu/helpers/colors.dart';
 import 'package:luyip_website_edu/helpers/utils.dart';
 import 'package:luyip_website_edu/home/main_page.dart';
 
@@ -39,129 +39,85 @@ class _LoginScreenState extends State<LoginScreen> {
 
       _auth
           .signInWithEmailAndPassword(
-            email: emailController.text.trim(),
-            password: passwordController.text.trim(),
-          )
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      )
           .then((userCredential) async {
-            // Verify user's role matches selected role
-            String uid = userCredential.user!.uid;
+        // Verify user's role matches selected role
+        String uid = userCredential.user!.uid;
 
-            try {
-              // Check if user exists in the selected role collection
-              DocumentSnapshot userDoc =
-                  await _firestore
-                      .collection('Users')
-                      .doc(selectedRole)
-                      .collection('accounts')
-                      .doc(emailController.text.trim())
-                      .get();
+        try {
+          // Check if user exists in the selected role collection
+          DocumentSnapshot userDoc = await _firestore
+              .collection('Users')
+              .doc(selectedRole)
+              .collection('accounts')
+              .doc(emailController.text.trim())
+              .get();
 
-              if (userDoc.exists) {
-                setState(() {
-                  loading = false;
-                });
-                Utils().toastMessage('Login successful');
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => MainPage(role: selectedRole),
-                  ),
-                );
-              } else {
-                // User not found in the selected role collection
-                await _auth.signOut();
-                setState(() {
-                  loading = false;
-                });
-                Utils().toastMessage(
-                  'User not registered as $selectedRole. Please select the correct role.',
-                );
-              }
-            } catch (e) {
-              setState(() {
-                loading = false;
-              });
-              Utils().toastMessage(e.toString());
-            }
-          })
-          .catchError((error) {
+          if (userDoc.exists) {
             setState(() {
               loading = false;
             });
-            Utils().toastMessage(error.toString());
+            Utils().toastMessage('Login successful');
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MainPage(role: selectedRole),
+              ),
+            );
+          } else {
+            // User not found in the selected role collection
+            await _auth.signOut();
+            setState(() {
+              loading = false;
+            });
+            Utils().toastMessage(
+              'User not registered as $selectedRole. Please select the correct role.',
+            );
+          }
+        } catch (e) {
+          setState(() {
+            loading = false;
           });
+          Utils().toastMessage(e.toString());
+        }
+      }).catchError((error) {
+        setState(() {
+          loading = false;
+        });
+        Utils().toastMessage(error.toString());
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final Size screenSize = MediaQuery.of(context).size;
-    final double height = screenSize.height;
-    final double width = screenSize.width;
+    final bool isLargeScreen = screenSize.width > 900;
+    final bool isMediumScreen =
+        screenSize.width > 600 && screenSize.width <= 900;
 
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: width * 0.08,
-              vertical: height * 0.05,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Logo Section
-                Image.asset(
-                  'assets/logo.png', // Replace with your logo path
-                  height: height * 0.15,
-                ),
-                SizedBox(height: height * 0.03),
-
-                // Login Card
-                Card(
-                  elevation: 8,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(width * 0.05),
-                    child: Column(
-                      children: [
-                        Text(
-                          'Welcome Back',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.deepPurple[800],
-                          ),
-                        ),
-                        SizedBox(height: height * 0.02),
-
-                        // Role Selection
-                        _buildRoleSelector(),
-                        SizedBox(height: height * 0.03),
-
-                        Form(
-                          key: _formfield,
-                          child: Column(
-                            children: [
-                              _buildEmailField(),
-                              SizedBox(height: height * 0.03),
-                              _buildPasswordField(),
-                              SizedBox(height: height * 0.02),
-                              _buildForgotPassword(),
-                              SizedBox(height: height * 0.04),
-                              _buildLoginButton(),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(height: height * 0.03),
-                _buildSignUpPrompt(),
-              ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              ColorManager.background,
+              Colors.white,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              child: isLargeScreen
+                  ? _buildLargeScreenLayout(screenSize)
+                  : isMediumScreen
+                      ? _buildMediumScreenLayout(screenSize)
+                      : _buildSmallScreenLayout(screenSize),
             ),
           ),
         ),
@@ -169,21 +125,336 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildRoleSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildLargeScreenLayout(Size screenSize) {
+    return Row(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Text(
-            'Select Role:',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[700],
-              fontWeight: FontWeight.w500,
+        // Left side with image/branding
+        Expanded(
+          flex: 5,
+          child: Container(
+            height: screenSize.height * 0.85,
+            margin: const EdgeInsets.only(left: 40, right: 20),
+            decoration: BoxDecoration(
+              color: ColorManager.primary.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 5,
+                ),
+              ],
+              image: const DecorationImage(
+                image: AssetImage('assets/images/login_bg.jpg'),
+                fit: BoxFit.cover,
+                opacity: 0.4,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Logo or icon
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.school,
+                    color: ColorManager.primary,
+                    size: 60,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                // Branding text
+                Text(
+                  'LUYIP EDUCATION',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 2.0,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Learning Today, Leading Tomorrow',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.white.withOpacity(0.9),
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 40),
+                // Features or benefits
+                _buildFeatureRow(
+                    Icons.verified_user_outlined, 'Expert Instructors'),
+                const SizedBox(height: 16),
+                _buildFeatureRow(
+                    Icons.play_circle_outline, 'Interactive Learning'),
+                const SizedBox(height: 16),
+                _buildFeatureRow(Icons.thumb_up_outlined, 'Quality Education'),
+                const SizedBox(height: 16),
+                _buildFeatureRow(Icons.support_agent_outlined, '24/7 Support'),
+              ],
             ),
           ),
         ),
+
+        // Right side with login form
+        Expanded(
+          flex: 4,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: _buildLoginForm(screenSize),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMediumScreenLayout(Size screenSize) {
+    return Container(
+      width: screenSize.width * 0.8,
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      child: Column(
+        children: [
+          // Top branding
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: ColorManager.primary,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+              ),
+            ),
+            child: Column(
+              children: [
+                // Logo or icon
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.school,
+                    color: ColorManager.primary,
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Branding text
+                Text(
+                  'LUYIP EDUCATION',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Learning Today, Leading Tomorrow',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.9),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Login form
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(24),
+                bottomRight: Radius.circular(24),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: _buildLoginForm(screenSize),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSmallScreenLayout(Size screenSize) {
+    return Container(
+      width: screenSize.width * 0.9,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Top branding
+          Container(
+            padding: const EdgeInsets.all(20),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: ColorManager.primary,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Column(
+              children: [
+                // Logo or icon
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.school,
+                    color: ColorManager.primary,
+                    size: 30,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Branding text
+                Text(
+                  'LUYIP EDUCATION',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Login form
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: _buildLoginForm(screenSize),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureRow(IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.white,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoginForm(Size screenSize) {
+    final bool isSmallScreen = screenSize.width <= 600;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (isSmallScreen) const SizedBox(height: 8),
+
+        // Login header
+        Text(
+          'Welcome Back',
+          style: TextStyle(
+            fontSize: isSmallScreen ? 24 : 30,
+            fontWeight: FontWeight.bold,
+            color: ColorManager.textDark,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Please sign in to access your account',
+          style: TextStyle(
+            fontSize: isSmallScreen ? 14 : 16,
+            color: ColorManager.textMedium,
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Role selection
+        _buildRoleSelector(isSmallScreen),
+        const SizedBox(height: 24),
+
+        // Login form
+        Form(
+          key: _formfield,
+          child: Column(
+            children: [
+              _buildEmailField(),
+              const SizedBox(height: 20),
+              _buildPasswordField(),
+              const SizedBox(height: 12),
+              _buildForgotPassword(),
+              const SizedBox(height: 32),
+              _buildLoginButton(),
+              const SizedBox(height: 20),
+              _buildSignUpPrompt(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRoleSelector(bool isSmallScreen) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Select Role',
+          style: TextStyle(
+            fontSize: isSmallScreen ? 14 : 16,
+            fontWeight: FontWeight.w600,
+            color: ColorManager.textDark,
+          ),
+        ),
+        const SizedBox(height: 12),
         Wrap(
           spacing: 10,
           runSpacing: 10,
@@ -205,13 +476,16 @@ class _LoginScreenState extends State<LoginScreen> {
       selected: isSelected,
       onSelected: (selected) => setState(() => selectedRole = role),
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : Colors.deepPurple[800],
+        color: isSelected ? Colors.white : ColorManager.textDark,
+        fontWeight: FontWeight.w500,
       ),
       backgroundColor: Colors.white,
-      selectedColor: Colors.deepPurple[800],
+      selectedColor: ColorManager.primary,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: Colors.deepPurple.shade300),
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: isSelected ? ColorManager.primary : Colors.grey.shade300,
+        ),
       ),
     );
   }
@@ -221,16 +495,23 @@ class _LoginScreenState extends State<LoginScreen> {
       controller: emailController,
       decoration: InputDecoration(
         labelText: 'Email Address',
-        floatingLabelBehavior: FloatingLabelBehavior.always,
-        prefixIcon: Icon(Icons.email, color: Colors.deepPurple[800]),
+        hintText: 'Enter your email',
+        prefixIcon: Icon(Icons.email_outlined, color: ColorManager.primary),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey.shade300),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: Colors.deepPurple.shade800, width: 2),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: ColorManager.primary, width: 2),
         ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        contentPadding: const EdgeInsets.symmetric(vertical: 16),
       ),
       validator: (value) {
         if (value!.isEmpty) return 'Please enter your email';
@@ -250,24 +531,33 @@ class _LoginScreenState extends State<LoginScreen> {
       obscureText: !_isPasswordVisible,
       decoration: InputDecoration(
         labelText: 'Password',
-        floatingLabelBehavior: FloatingLabelBehavior.always,
-        prefixIcon: Icon(Icons.lock, color: Colors.deepPurple[800]),
+        hintText: 'Enter your password',
+        prefixIcon: Icon(Icons.lock_outline, color: ColorManager.primary),
         suffixIcon: IconButton(
           icon: Icon(
-            _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-            color: Colors.deepPurple[800],
+            _isPasswordVisible
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined,
+            color: ColorManager.primary,
           ),
-          onPressed:
-              () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+          onPressed: () =>
+              setState(() => _isPasswordVisible = !_isPasswordVisible),
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey.shade300),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: Colors.deepPurple.shade800, width: 2),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: ColorManager.primary, width: 2),
         ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        contentPadding: const EdgeInsets.symmetric(vertical: 16),
       ),
       validator: (value) {
         if (value!.isEmpty) return 'Please enter your password';
@@ -284,11 +574,15 @@ class _LoginScreenState extends State<LoginScreen> {
         onPressed: () {
           /* Add forgot password logic */
         },
+        style: TextButton.styleFrom(
+          foregroundColor: ColorManager.textDark,
+          padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 8),
+        ),
         child: Text(
           'Forgot Password?',
           style: TextStyle(
-            color: Colors.deepPurple[800],
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
           ),
         ),
       ),
@@ -298,34 +592,35 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildLoginButton() {
     return SizedBox(
       width: double.infinity,
+      height: 50,
       child: ElevatedButton(
-        onPressed: login,
+        onPressed: loading ? null : login,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.deepPurple[800],
-          padding: EdgeInsets.symmetric(vertical: 16),
+          backgroundColor: ColorManager.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
+            borderRadius: BorderRadius.circular(12),
           ),
-          elevation: 5,
+          disabledBackgroundColor: ColorManager.primary.withOpacity(0.7),
         ),
-        child:
-            loading
-                ? SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-                : Text(
-                  'LOG IN',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+        child: loading
+            ? SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
                 ),
+              )
+            : const Text(
+                'Sign In',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                ),
+              ),
       ),
     );
   }
@@ -336,19 +631,25 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         Text(
           "Don't have an account? ",
-          style: TextStyle(color: Colors.grey[700]),
+          style: TextStyle(
+            color: ColorManager.textMedium,
+            fontSize: 14,
+          ),
         ),
         TextButton(
-          onPressed:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => SignUpScreen()),
-              ),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => SignUpScreen()),
+          ),
+          style: TextButton.styleFrom(
+            foregroundColor: ColorManager.primary,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
           child: Text(
             'Sign Up',
             style: TextStyle(
-              color: Colors.deepPurple[800],
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
             ),
           ),
         ),

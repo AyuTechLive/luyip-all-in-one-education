@@ -1,1 +1,79 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"education-all-in-one","appId":"1:990218908789:android:e7557b737c74231d9af43c","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"education-all-in-one","configurations":{"android":"1:990218908789:android:e7557b737c74231d9af43c","ios":"1:990218908789:ios:c2f7c4db1f0556909af43c","macos":"1:990218908789:ios:c2f7c4db1f0556909af43c","web":"1:990218908789:web:28f2d0c4930a61199af43c","windows":"1:990218908789:web:8e9657567a0f64319af43c"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "education-all-in-one",
+          "appId": "1:990218908789:android:e7557b737c74231d9af43c",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "education-all-in-one",
+          "configurations": {
+            "android": "1:990218908789:android:e7557b737c74231d9af43c",
+            "ios": "1:990218908789:ios:c2f7c4db1f0556909af43c",
+            "macos": "1:990218908789:ios:c2f7c4db1f0556909af43c",
+            "web": "1:990218908789:web:28f2d0c4930a61199af43c",
+            "windows": "1:990218908789:web:8e9657567a0f64319af43c"
+          }
+        }
+      }
+    }
+  },
+  "emulators": {
+    "dataconnect": {
+      "dataDir": "dataconnect/.dataconnect/pgliteData"
+    }
+  },
+  "dataconnect": {
+    "source": "dataconnect"
+  },
+  "firestore": {
+    "database": "(default)",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    },
+    {
+      "source": "luyip",
+      "codebase": "luyip",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

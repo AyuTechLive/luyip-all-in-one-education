@@ -5,8 +5,10 @@ import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/manage_test.d
 import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/students.dart';
 import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/teachers.dart';
 import 'package:luyip_website_edu/admin_dashboard/dummyadmin.dart';
+import 'package:luyip_website_edu/auth/auth_service.dart';
 import 'package:luyip_website_edu/auth/loginscreen.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
+import 'package:luyip_website_edu/website/student_home_content.dart';
 
 // Create a main dashboard container that will hold both sidebar and content
 class AdminDashboardContainer extends StatefulWidget {
@@ -55,7 +57,7 @@ class _AdminDashboardContainerState extends State<AdminDashboardContainer> {
       case 'Notifications':
         return const NotificationsContent();
       case 'Settings':
-        return const SettingsContent();
+        return const WebsiteGeneralAdminPage();
       default:
         return const DashboardContent();
     }
@@ -379,12 +381,7 @@ class DashboardSidebar extends StatelessWidget {
               child: GestureDetector(
                 onTap: () {
                   // Handle logout
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
-                    ),
-                  );
+                  _showLogoutConfirmationDialog(context);
                 },
                 child: Row(
                   children: [
@@ -478,6 +475,39 @@ class DashboardSidebar extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showLogoutConfirmationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: ColorManager.textDark),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Call the logout method from AuthService
+              AuthService().logout(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ColorManager.error,
+            ),
+            child: const Text(
+              'Logout',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
   }

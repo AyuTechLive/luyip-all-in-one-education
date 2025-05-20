@@ -28,9 +28,8 @@ class _CourseMaterialsState extends State<CourseMaterials> {
 
     try {
       // Use the same database reference structure as in AddLecturesAdmin
-      final databaseRef = FirebaseDatabase.instance
-          .ref(widget.courseName)
-          .child('SUBJECTS');
+      final databaseRef =
+          FirebaseDatabase.instance.ref(widget.courseName).child('SUBJECTS');
       DatabaseEvent event = await databaseRef.once();
 
       if (event.snapshot.value != null) {
@@ -86,12 +85,33 @@ class _CourseMaterialsState extends State<CourseMaterials> {
     return Icons.book.codePoint;
   }
 
-  IconData _getIconData(dynamic iconCode) {
-    // Convert icon code to IconData or fallback to a default
-    if (iconCode is int) {
-      return IconData(iconCode, fontFamily: 'MaterialIcons');
+  IconData _getIconData(String iconType) {
+    // Map string identifiers to constant IconData objects
+    switch (iconType) {
+      case 'notice':
+        return Icons.campaign;
+      case 'strength':
+        return Icons.layers;
+      case 'thermo':
+        return Icons.thermostat;
+      case 'industrial':
+        return Icons.factory;
+      case 'mechanic':
+        return Icons.article;
+      case 'machine':
+        return Icons.precision_manufacturing;
+      case 'heat':
+        return Icons.whatshot;
+      case 'fluid':
+        return Icons.water;
+      case 'design':
+        return Icons.settings;
+      case 'material':
+        return Icons.science;
+      case 'book':
+      default:
+        return Icons.book;
     }
-    return Icons.book;
   }
 
   Color _getIconColor(Map<String, dynamic> subject) {
@@ -131,12 +151,11 @@ class _CourseMaterialsState extends State<CourseMaterials> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (context) => SubjectDetailPage(
-              subjectId: subjectId,
-              subjectName: subjectName,
-              courseName: widget.courseName,
-            ),
+        builder: (context) => SubjectDetailPage(
+          subjectId: subjectId,
+          subjectName: subjectName,
+          courseName: widget.courseName,
+        ),
       ),
     );
   }
@@ -232,11 +251,11 @@ class _CourseMaterialsState extends State<CourseMaterials> {
                     padding: const EdgeInsets.all(16),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 4,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                        ),
+                      crossAxisCount: 2,
+                      childAspectRatio: 4,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                    ),
                     itemCount: subjects.length,
                     itemBuilder: (context, index) {
                       final subject = subjects[index];
@@ -244,11 +263,10 @@ class _CourseMaterialsState extends State<CourseMaterials> {
                       final Color iconColor = _getIconColor(subject);
 
                       return GestureDetector(
-                        onTap:
-                            () => _navigateToSubjectDetail(
-                              subject['id'],
-                              subject['name'],
-                            ),
+                        onTap: () => _navigateToSubjectDetail(
+                          subject['id'],
+                          subject['name'],
+                        ),
                         child: Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
