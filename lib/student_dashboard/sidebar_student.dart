@@ -7,11 +7,17 @@ import 'package:luyip_website_edu/helpers/colors.dart';
 class StudentSidebar extends StatefulWidget {
   final String selectedPage;
   final Function(String) onPageChanged;
+  final bool isMobile;
+  final bool isExpanded;
+  final VoidCallback? onToggle;
 
   const StudentSidebar({
     Key? key,
     required this.selectedPage,
     required this.onPageChanged,
+    this.isMobile = false,
+    this.isExpanded = true,
+    this.onToggle,
   }) : super(key: key);
 
   @override
@@ -88,312 +94,388 @@ class _StudentSidebarState extends State<StudentSidebar> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: double.infinity,
-      width: 250,
-      child: Container(
-        // Use a light color for the sidebar background
-        color: const Color(0xFFF5F7FA),
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            // Student profile area with gradient background
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [ColorManager.primary, ColorManager.primaryDark],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: ColorManager.primary.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Center(
-                child: Text(
-                  "LUYIP",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 22,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
+    // Determine sidebar width based on expanded state and screen size
+    double sidebarWidth = widget.isExpanded ? 250 : 70;
+    if (!widget.isExpanded && !widget.isMobile) {
+      sidebarWidth = 70; // Collapsed width for desktop
+    } else if (widget.isMobile && widget.isExpanded) {
+      sidebarWidth = 250; // Full width when expanded on mobile
+    } else if (widget.isMobile && !widget.isExpanded) {
+      sidebarWidth = 0; // Hidden when collapsed on mobile
+    }
 
-            // Student profile section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: sidebarWidth,
+      height: double.infinity,
+      child: widget.isMobile && !widget.isExpanded
+          ? Container() // Return empty container when sidebar is collapsed on mobile
+          : Container(
+              // Use a light color for the sidebar background
+              color: const Color(0xFFF5F7FA),
+              child: Column(
                 children: [
-                  _isLoading
-                      ? const SizedBox(
-                          width: 48,
-                          height: 48,
-                          child: CircularProgressIndicator(),
-                        )
-                      : CircleAvatar(
-                          radius: 24,
-                          backgroundColor: ColorManager.primaryLight,
-                          child: Text(
-                            _studentInitial,
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: ColorManager.primaryDark,
-                            ),
-                          ),
-                        ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _isLoading ? "Loading..." : _studentName,
-                          style: TextStyle(
-                            color: ColorManager.textDark,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _isLoading ? "" : _studentEmail,
-                          style: TextStyle(
-                            color: ColorManager.textMedium,
-                            fontSize: 12,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 20),
+                  // Logo header with toggle button
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          ColorManager.primary,
+                          ColorManager.primaryDark
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: ColorManager.primary.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (widget.isExpanded)
+                          const Text(
+                            "LUYIP",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 22,
+                              letterSpacing: 1.5,
+                            ),
+                          )
+                        else
+                          const Text(
+                            "L",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 22,
+                            ),
+                          ),
+                        // Only show toggle button on desktop collapsed view
+                        if (!widget.isMobile && !widget.isExpanded)
+                          IconButton(
+                            icon: const Icon(
+                              Icons.chevron_right,
+                              color: Colors.white,
+                            ),
+                            onPressed: widget.onToggle,
+                          ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(height: 24),
+
+                  // Student profile section - show only when expanded
+                  if (widget.isExpanded)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          _isLoading
+                              ? const SizedBox(
+                                  width: 48,
+                                  height: 48,
+                                  child: CircularProgressIndicator(),
+                                )
+                              : CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: ColorManager.primaryLight,
+                                  child: Text(
+                                    _studentInitial,
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: ColorManager.primaryDark,
+                                    ),
+                                  ),
+                                ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _isLoading ? "Loading..." : _studentName,
+                                  style: TextStyle(
+                                    color: ColorManager.textDark,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _isLoading ? "" : _studentEmail,
+                                  style: TextStyle(
+                                    color: ColorManager.textMedium,
+                                    fontSize: 12,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (!widget
+                      .isMobile) // Show only avatar in collapsed desktop mode
+                    _isLoading
+                        ? const SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: CircularProgressIndicator(),
+                          )
+                        : CircleAvatar(
+                            radius: 20,
+                            backgroundColor: ColorManager.primaryLight,
+                            child: Text(
+                              _studentInitial,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: ColorManager.primaryDark,
+                              ),
+                            ),
+                          ),
+
+                  const SizedBox(height: 24),
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: ColorManager.textLight.withOpacity(0.2),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Menu section title - only when expanded
+                  if (widget.isExpanded)
+                    Padding(
+                      padding:
+                          const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          "MAIN MENU",
+                          style: TextStyle(
+                            color: ColorManager.textMedium,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Menu items
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        children: [
+                          _buildSidebarItem(
+                            context,
+                            Icons.dashboard_outlined,
+                            'Dashboard',
+                            isActive: widget.selectedPage == 'Dashboard',
+                          ),
+                          _buildSidebarItem(
+                            context,
+                            Icons.class_outlined,
+                            'My Batches',
+                            isActive: widget.selectedPage == 'My Batches',
+                            badge: '3',
+                          ),
+                          _buildSidebarItem(
+                            context,
+                            Icons.menu_book_outlined,
+                            'All Courses',
+                            isActive: widget.selectedPage == 'All Courses',
+                          ),
+                          _buildSidebarItem(
+                            context,
+                            Icons.card_membership_outlined,
+                            'Certificates',
+                            isActive: widget.selectedPage == 'Certificates',
+                            badge: '2',
+                          ),
+
+                          if (widget.isExpanded) const SizedBox(height: 16),
+                          Divider(
+                            height: 1,
+                            thickness: 1,
+                            indent: 16,
+                            endIndent: 16,
+                            color: ColorManager.textLight.withOpacity(0.2),
+                          ),
+                          if (widget.isExpanded) const SizedBox(height: 16),
+
+                          // Learning section title - only when expanded
+                          if (widget.isExpanded)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                left: 16,
+                                right: 16,
+                                bottom: 8,
+                              ),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  "LEARNING",
+                                  style: TextStyle(
+                                    color: ColorManager.textMedium,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                          _buildSidebarItem(
+                            context,
+                            Icons.calendar_today_outlined,
+                            'Schedule',
+                            isActive: widget.selectedPage == 'Schedule',
+                          ),
+                          _buildSidebarItem(
+                            context,
+                            Icons.assignment_outlined,
+                            'Assignments',
+                            isActive: widget.selectedPage == 'Assignments',
+                            badge: '4',
+                          ),
+                          _buildSidebarItem(
+                            context,
+                            Icons.library_books_outlined,
+                            'Library',
+                            isActive: widget.selectedPage == 'Library',
+                          ),
+                          _buildSidebarItem(
+                            context,
+                            Icons.workspace_premium_outlined,
+                            'Take Membership',
+                            isActive: widget.selectedPage == 'Take Membership',
+                            hasProTag: true,
+                          ),
+
+                          if (widget.isExpanded) const SizedBox(height: 16),
+                          Divider(
+                            height: 1,
+                            thickness: 1,
+                            indent: 16,
+                            endIndent: 16,
+                            color: ColorManager.textLight.withOpacity(0.2),
+                          ),
+                          if (widget.isExpanded) const SizedBox(height: 16),
+
+                          // Account section title - only when expanded
+                          if (widget.isExpanded)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                left: 16,
+                                right: 16,
+                                bottom: 8,
+                              ),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  "ACCOUNT",
+                                  style: TextStyle(
+                                    color: ColorManager.textMedium,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                          _buildSidebarItem(
+                            context,
+                            Icons.message_outlined,
+                            'Messages',
+                            isActive: widget.selectedPage == 'Messages',
+                            badge: '5',
+                          ),
+                          _buildSidebarItem(
+                            context,
+                            Icons.settings_outlined,
+                            'Settings',
+                            isActive: widget.selectedPage == 'Settings',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Footer with logout button - show only in expanded view
+                  if (widget.isExpanded)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      child: GestureDetector(
+                        onTap: () {
+                          // Show confirmation dialog before logout
+                          _showLogoutConfirmationDialog(context);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                spreadRadius: 1,
+                                blurRadius: 3,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.logout,
+                                  color: ColorManager.error, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                "Logout",
+                                style: TextStyle(
+                                  color: ColorManager.error,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (!widget
+                      .isMobile) // Show icon-only logout in collapsed desktop mode
+                    IconButton(
+                      icon: Icon(
+                        Icons.logout,
+                        color: ColorManager.error,
+                      ),
+                      onPressed: () {
+                        _showLogoutConfirmationDialog(context);
+                      },
+                    ),
                 ],
               ),
             ),
-
-            const SizedBox(height: 24),
-            Divider(
-              height: 1,
-              thickness: 1,
-              indent: 16,
-              endIndent: 16,
-              color: ColorManager.textLight.withOpacity(0.2),
-            ),
-            const SizedBox(height: 16),
-
-            // Menu section title
-            Padding(
-              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  "MAIN MENU",
-                  style: TextStyle(
-                    color: ColorManager.textMedium,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
-            ),
-
-            // Menu items
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  children: [
-                    _buildSidebarItem(
-                      context,
-                      Icons.dashboard_outlined,
-                      'Dashboard',
-                      isActive: widget.selectedPage == 'Dashboard',
-                    ),
-                    _buildSidebarItem(
-                      context,
-                      Icons.class_outlined,
-                      'My Batches',
-                      isActive: widget.selectedPage == 'My Batches',
-                      badge: '3',
-                    ),
-                    _buildSidebarItem(
-                      context,
-                      Icons.menu_book_outlined,
-                      'All Courses',
-                      isActive: widget.selectedPage == 'All Courses',
-                    ),
-                    _buildSidebarItem(
-                      context,
-                      Icons.card_membership_outlined,
-                      'Certificates',
-                      isActive: widget.selectedPage == 'Certificates',
-                      badge: '2',
-                    ),
-
-                    const SizedBox(height: 16),
-                    Divider(
-                      height: 1,
-                      thickness: 1,
-                      indent: 16,
-                      endIndent: 16,
-                      color: ColorManager.textLight.withOpacity(0.2),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Learning section title
-                    Padding(
-                      padding: const EdgeInsets.only(
-                        left: 16,
-                        right: 16,
-                        bottom: 8,
-                      ),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          "LEARNING",
-                          style: TextStyle(
-                            color: ColorManager.textMedium,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    _buildSidebarItem(
-                      context,
-                      Icons.calendar_today_outlined,
-                      'Schedule',
-                      isActive: widget.selectedPage == 'Schedule',
-                    ),
-                    _buildSidebarItem(
-                      context,
-                      Icons.assignment_outlined,
-                      'Assignments',
-                      isActive: widget.selectedPage == 'Assignments',
-                      badge: '4',
-                    ),
-                    _buildSidebarItem(
-                      context,
-                      Icons.library_books_outlined,
-                      'Library',
-                      isActive: widget.selectedPage == 'Library',
-                    ),
-                    _buildSidebarItem(
-                      context,
-                      Icons.workspace_premium_outlined,
-                      'Take Membership',
-                      isActive: widget.selectedPage == 'Take Membership',
-                      hasProTag: true,
-                    ),
-
-                    const SizedBox(height: 16),
-                    Divider(
-                      height: 1,
-                      thickness: 1,
-                      indent: 16,
-                      endIndent: 16,
-                      color: ColorManager.textLight.withOpacity(0.2),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Account section title
-                    Padding(
-                      padding: const EdgeInsets.only(
-                        left: 16,
-                        right: 16,
-                        bottom: 8,
-                      ),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          "ACCOUNT",
-                          style: TextStyle(
-                            color: ColorManager.textMedium,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    _buildSidebarItem(
-                      context,
-                      Icons.message_outlined,
-                      'Messages',
-                      isActive: widget.selectedPage == 'Messages',
-                      badge: '5',
-                    ),
-                    _buildSidebarItem(
-                      context,
-                      Icons.settings_outlined,
-                      'Settings',
-                      isActive: widget.selectedPage == 'Settings',
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Footer with logout button - Updated with AuthService
-            Container(
-              padding: const EdgeInsets.all(16),
-              child: GestureDetector(
-                onTap: () {
-                  // Show confirmation dialog before logout
-                  _showLogoutConfirmationDialog(context);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        spreadRadius: 1,
-                        blurRadius: 3,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.logout, color: ColorManager.error, size: 18),
-                      const SizedBox(width: 8),
-                      Text(
-                        "Logout",
-                        style: TextStyle(
-                          color: ColorManager.error,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -443,6 +525,9 @@ class _StudentSidebarState extends State<StudentSidebar> {
       onTap: () {
         // Use the callback to change the page
         widget.onPageChanged(label);
+        if (widget.isMobile && Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -454,25 +539,29 @@ class _StudentSidebarState extends State<StudentSidebar> {
         ),
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         child: Row(
+          mainAxisAlignment: widget.isExpanded
+              ? MainAxisAlignment.start
+              : MainAxisAlignment.center,
           children: [
             Icon(
               icon,
               color: isActive ? ColorManager.primary : ColorManager.textMedium,
               size: 20,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color:
-                      isActive ? ColorManager.primary : ColorManager.textDark,
-                  fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                  fontSize: 14,
+            if (widget.isExpanded) const SizedBox(width: 12),
+            if (widget.isExpanded)
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color:
+                        isActive ? ColorManager.primary : ColorManager.textDark,
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                    fontSize: 14,
+                  ),
                 ),
               ),
-            ),
-            if (hasProTag)
+            if (widget.isExpanded && hasProTag)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
@@ -488,7 +577,7 @@ class _StudentSidebarState extends State<StudentSidebar> {
                   ),
                 ),
               ),
-            if (badge != null)
+            if (widget.isExpanded && badge != null)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(

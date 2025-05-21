@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:luyip_website_edu/Courses/allcourses.dart';
 import 'package:luyip_website_edu/Courses/course_deatils.dart';
+import 'package:luyip_website_edu/Courses/course_details/course_details.dart';
 import 'package:luyip_website_edu/admin_dashboard/sidebar.dart';
 import 'package:luyip_website_edu/auth/loginscreen.dart';
 import 'package:luyip_website_edu/firebase_options.dart';

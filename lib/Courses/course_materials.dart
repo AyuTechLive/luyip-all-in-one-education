@@ -52,7 +52,7 @@ class _CourseMaterialsState extends State<CourseMaterials> {
           subjects.add({
             'id': key,
             'name': key, // Subject name is the key in the database
-            'icon': _getIconCodeForSubject(key.toString()),
+            'icon': _getIconTypeForSubject(key.toString()),
             'chapters': chaptersCount,
           });
         });
@@ -134,6 +134,24 @@ class _CourseMaterialsState extends State<CourseMaterials> {
     return colors[charCode % colors.length];
   }
 
+  String _getIconTypeForSubject(String subjectName) {
+    // Assign appropriate icon types based on subject name
+    String lowercaseSubject = subjectName.toLowerCase();
+
+    if (lowercaseSubject.contains('notice')) return 'notice';
+    if (lowercaseSubject.contains('strength')) return 'strength';
+    if (lowercaseSubject.contains('thermo')) return 'thermo';
+    if (lowercaseSubject.contains('industrial')) return 'industrial';
+    if (lowercaseSubject.contains('mechanic')) return 'mechanic';
+    if (lowercaseSubject.contains('machine')) return 'machine';
+    if (lowercaseSubject.contains('heat')) return 'heat';
+    if (lowercaseSubject.contains('fluid')) return 'fluid';
+    if (lowercaseSubject.contains('design')) return 'design';
+    if (lowercaseSubject.contains('material')) return 'material';
+
+    // Default icon
+    return 'book';
+  }
   // In the CourseMaterials class, update the _navigateToSubjectDetail method:
 
   void _navigateToSubjectDetail(String subjectId, String subjectName) {

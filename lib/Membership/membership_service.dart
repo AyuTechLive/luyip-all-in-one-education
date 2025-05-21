@@ -2,10 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:razorpay_web/razorpay_web.dart';
+// Import the unified transaction service
+import 'package:luyip_website_edu/Courses/transaction_service.dart'; // Update path if needed
 
 class MembershipService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final TransactionService _transactionService =
+      TransactionService(); // Add this
 
   // Get current user's membership status
   Future<Map<String, dynamic>> getMembershipStatus() async {
@@ -126,54 +130,16 @@ class MembershipService {
     }
   }
 
-  // Activate membership after successful payment
+  // Activate membership after successful payment - DEPRECATED
+  // This method is kept for backward compatibility but delegates to the TransactionService
   Future<bool> activateMembership(String transactionId) async {
     try {
-      User? currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw Exception("User not logged in");
-      }
-
-      // Create membership start and expiry dates
-      DateTime startDate = DateTime.now();
-      DateTime expiryDate = startDate.add(const Duration(days: 365));
-
-      // Generate membership ID
-      String membershipId =
-          'MEM-${startDate.day}${startDate.month}${startDate.year}-${currentUser.uid.substring(0, 4)}';
-
-      // Record transaction
-      await _firestore.collection('Transactions').add({
-        'userId': currentUser.uid,
-        'userEmail': currentUser.email,
-        'transactionId': transactionId,
-        'type': 'membership',
-        'amount': 1000,
-        'currency': 'INR',
-        'status': 'completed',
-        'timestamp': FieldValue.serverTimestamp(),
-        'membershipId': membershipId,
-        'startDate': startDate,
-        'expiryDate': expiryDate,
-      });
-
-      // Update user document with membership info
-      await _firestore
-          .collection('Users')
-          .doc('student')
-          .collection('accounts')
-          .doc(currentUser.email)
-          .update({
-        'membership': {
-          'isActive': true,
-          'startDate': startDate,
-          'expiryDate': expiryDate,
-          'membershipId': membershipId,
-          'transactionId': transactionId,
-        }
-      });
-
-      return true;
+      // Delegate to the new TransactionService
+      return await _transactionService.activateMembership(
+        transactionId: transactionId,
+        amount: 1000.0, // Annual membership fee (₹1000)
+        currency: 'INR',
+      );
     } catch (e) {
       print("Error activating membership: $e");
       return false;

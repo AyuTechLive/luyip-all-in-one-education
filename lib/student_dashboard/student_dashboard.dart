@@ -23,9 +23,12 @@ class StudentDashboardContainer extends StatefulWidget {
       _StudentDashboardContainerState();
 }
 
+final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
 class _StudentDashboardContainerState extends State<StudentDashboardContainer> {
   late String _currentPage;
   late Widget _currentContent;
+  bool _isSidebarExpanded = true;
 
   @override
   void initState() {
@@ -62,32 +65,77 @@ class _StudentDashboardContainerState extends State<StudentDashboardContainer> {
     }
   }
 
+  bool _isSmallScreen(BuildContext context) {
+    return MediaQuery.of(context).size.width < 768;
+  }
+
+  void _toggleSidebar() {
+    if (_isSmallScreen(context)) {
+      // For mobile: toggle drawer
+      if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+        Navigator.of(context).pop();
+      } else {
+        _scaffoldKey.currentState?.openDrawer();
+      }
+    } else {
+      // For desktop: toggle sidebar width
+      setState(() {
+        _isSidebarExpanded = !_isSidebarExpanded;
+      });
+    }
+  }
+
   void _changePage(String pageName) {
     setState(() {
       _currentPage = pageName;
       _currentContent = _getContentForPage(pageName);
+
+      // For mobile, close drawer when page changes
+      if (_isSmallScreen(context)) {
+        // Close drawer if open
+        if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+          Navigator.of(context).pop();
+        }
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isSmallScreen = _isSmallScreen(context);
+
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         elevation: 0,
+        leading: IconButton(
+          // Replace any existing leading widget
+          icon: Icon(
+            Icons.menu,
+            color: Colors.white,
+          ),
+          onPressed: _toggleSidebar,
+        ),
         title: Text(
-          'Luyip Student Portal - $_currentPage',
+          isSmallScreen
+              ? _currentPage // Show just page name on mobile
+              : 'Luyip Student Portal - $_currentPage',
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         backgroundColor: ColorManager.primary,
         actions: [
-          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
+          if (!isSmallScreen)
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () {},
+            ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () {},
             tooltip: 'Notifications',
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 5 : 10),
             child: CircleAvatar(
               backgroundColor: ColorManager.primaryLight,
               child: IconButton(
@@ -102,21 +150,46 @@ class _StudentDashboardContainerState extends State<StudentDashboardContainer> {
           ),
         ],
       ),
+      // Mobile drawer that appears when sidebar is expanded on mobile
+      drawer: isSmallScreen
+          ? Drawer(
+              child: StudentSidebar(
+                selectedPage: _currentPage,
+                onPageChanged: _changePage,
+                isMobile: true,
+                isExpanded: true,
+              ),
+            )
+          : null,
       body: Container(
         color: ColorManager.background,
         child: Row(
           children: [
-            // Pass the current page and page change callback to sidebar
-            StudentSidebar(
-              selectedPage: _currentPage,
-              onPageChanged: _changePage,
-            ),
+            // Hide sidebar on mobile when collapsed
+            if (!isSmallScreen)
+              StudentSidebar(
+                selectedPage: _currentPage,
+                onPageChanged: _changePage,
+                isMobile: false,
+                isExpanded: _isSidebarExpanded,
+                onToggle: _toggleSidebar,
+              ),
 
             // Dynamic content area based on selected page
-            Expanded(child: _currentContent),
+            Expanded(
+              child: _currentContent,
+            ),
           ],
         ),
       ),
+      // FAB for mobile to show the menu
+      floatingActionButton: isSmallScreen && !_isSidebarExpanded
+          ? FloatingActionButton(
+              onPressed: _toggleSidebar,
+              backgroundColor: ColorManager.primary,
+              child: const Icon(Icons.menu),
+            )
+          : null,
     );
   }
 }
@@ -156,8 +229,20 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
     return await _dashboardController.getAllDashboardData();
   }
 
+  bool _isSmallScreen(BuildContext context) {
+    return MediaQuery.of(context).size.width < 768;
+  }
+
+  bool _isMediumScreen(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    return width >= 768 && width < 1024;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bool isSmallScreen = _isSmallScreen(context);
+    final bool isMediumScreen = _isMediumScreen(context);
+
     return FutureBuilder<Map<String, dynamic>>(
       future: _dashboardDataFuture,
       builder: (context, snapshot) {
@@ -192,269 +277,31 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
         final String userName = userProfile['Name'] ?? 'Student';
         final String userCourse = userProfile['Role'] ?? 'Student';
 
+        // Use different padding based on screen size
+        final contentPadding = isSmallScreen
+            ? const EdgeInsets.all(16.0)
+            : const EdgeInsets.all(24.0);
+
         return Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: contentPadding,
           child: ListView(
             controller: _scrollController,
             children: [
-              // Welcome section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Welcome, $userName!',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: ColorManager.textDark,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Your learning journey continues. Here\'s what\'s new today.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: ColorManager.textMedium,
-                        ),
-                      ),
-                    ],
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const AllCoursesScreen(userType: "student"),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text('Join Course'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ColorManager.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 2,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              // Welcome section - Responsive layout
+              _buildWelcomeSection(userName, isSmallScreen),
               const SizedBox(height: 32),
 
               // Membership status card (if not a member)
-              if (!isMember) _buildMembershipPromoCard(),
+              if (!isMember) _buildMembershipPromoCard(isSmallScreen),
               if (!isMember) const SizedBox(height: 24),
 
-              // Quick action buttons
-              Row(
-                children: [
-                  _buildQuickActionButton(
-                    'Continue Learning',
-                    Icons.play_circle_outline,
-                    ColorManager.primary,
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const AllCoursesScreen(userType: "student"),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 16),
-                  _buildQuickActionButton(
-                    'View Assignments',
-                    Icons.assignment_outlined,
-                    ColorManager.warning,
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const AllCoursesScreen(userType: "student"),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 16),
-                  _buildQuickActionButton(
-                    'Join Live Class',
-                    Icons.videocam_outlined,
-                    ColorManager.error,
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const AllCoursesScreen(userType: "student"),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-
+              // Quick action buttons - wrap in responsive layout
+              _buildQuickActionsRow(isSmallScreen),
               const SizedBox(height: 32),
 
               // Current progress section
               if (enrolledCourses.isNotEmpty) ...[
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: ColorManager.dark.withOpacity(0.05),
-                        spreadRadius: 1,
-                        blurRadius: 5,
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Continue Your Learning',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: ColorManager.textDark,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const AllCoursesScreen(
-                                      userType: "student"),
-                                ),
-                              );
-                            },
-                            child: Text(
-                              'View All',
-                              style: TextStyle(
-                                color: ColorManager.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      // Display the first 3 enrolled courses (or fewer if less than 3)
-                      ...List.generate(
-                        enrolledCourses.length > 3 ? 3 : enrolledCourses.length,
-                        (index) {
-                          final course = enrolledCourses[index];
-                          final courseName =
-                              course['Course Name'] ?? 'Unknown Course';
-                          final courseDescription =
-                              course['Course Discription'] ?? '';
-                          final progress = course['progress'] as double;
-                          final lastAccessed =
-                              course['lastAccessed'] as DateTime?;
-                          final color = [
-                            ColorManager.primary,
-                            ColorManager.secondary,
-                            ColorManager.info,
-                          ][index % 3];
-
-                          String moduleText = 'In progress';
-                          if (courseDescription.isNotEmpty) {
-                            final words = courseDescription.split(' ');
-                            moduleText = words.length > 5
-                                ? 'Module: ${words.take(5).join(' ')}...'
-                                : courseDescription;
-                          }
-
-                          return Column(
-                            children: [
-                              _buildCourseProgressItem(
-                                courseName,
-                                moduleText,
-                                progress,
-                                color,
-                                lastAccessed,
-                              ),
-                              if (index <
-                                  (enrolledCourses.length > 3
-                                          ? 3
-                                          : enrolledCourses.length) -
-                                      1)
-                                const SizedBox(height: 16),
-                            ],
-                          );
-                        },
-                      ),
-                      if (enrolledCourses.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.school_outlined,
-                                  size: 48,
-                                  color: ColorManager.textLight,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'No courses enrolled yet',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: ColorManager.textMedium,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Join a course to start your learning journey',
-                                  style: TextStyle(
-                                    color: ColorManager.textLight,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const AllCoursesScreen(
-                                                userType: "student"),
-                                      ),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: ColorManager.primary,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  child: const Text('Browse Courses'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
+                _buildEnrolledCoursesSection(enrolledCourses, isSmallScreen),
                 const SizedBox(height: 32),
               ],
 
@@ -464,185 +311,45 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
                 const SizedBox(height: 32),
               ],
 
-              // Statistics and upcoming events layout
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Statistics cards
-                  Expanded(
-                    flex: 3,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Your Statistics',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: ColorManager.textDark,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildStatCard(
-                                'Enrolled Courses',
-                                '${enrolledCourses.length}',
-                                Icons.book_outlined,
-                                ColorManager.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: _buildStatCard(
-                                'Completed',
-                                '${completedCourses.length}',
-                                Icons.check_circle_outline,
-                                ColorManager.success,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildStatCard(
-                                'Certificates',
-                                '${completedCourses.length}',
-                                Icons.card_membership_outlined,
-                                ColorManager.warning,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: _buildStatCard(
-                                'Tests Taken',
-                                '${testsTaken.length}',
-                                Icons.access_time_outlined,
-                                ColorManager.info,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+              // Statistics and upcoming events - Responsive layout
+              if (isSmallScreen) ...[
+                // For mobile, stack vertically
+                _buildStatisticsSection(
+                  enrolledCourses.length,
+                  completedCourses.length,
+                  testsTaken.length,
+                ),
+                const SizedBox(height: 24),
+                _buildUpcomingEventsSection(upcomingEvents),
+              ] else ...[
+                // For tablet and desktop, use row layout
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Statistics cards
+                    Expanded(
+                      flex: 3,
+                      child: _buildStatisticsSection(
+                        enrolledCourses.length,
+                        completedCourses.length,
+                        testsTaken.length,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 24),
-                  // Upcoming events
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Upcoming Schedule',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: ColorManager.textDark,
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const AllCoursesScreen(
-                                            userType: "student"),
-                                  ),
-                                );
-                              },
-                              child: Text(
-                                'View All',
-                                style: TextStyle(
-                                  color: ColorManager.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Container(
-                          height: 320,
-                          child: upcomingEvents.isNotEmpty
-                              ? ListView.builder(
-                                  padding: EdgeInsets.zero,
-                                  itemCount: upcomingEvents.length > 4
-                                      ? 4
-                                      : upcomingEvents.length,
-                                  itemBuilder: (context, index) {
-                                    final event = upcomingEvents[index];
-                                    final String category =
-                                        event['category'] ?? 'General';
-                                    final String title =
-                                        event['title'] ?? 'Event';
-                                    final String time =
-                                        event['time'] ?? 'Upcoming';
-                                    final Color color =
-                                        _getCategoryColor(category);
-
-                                    return Column(
-                                      children: [
-                                        _buildEventCard(
-                                          category,
-                                          title,
-                                          time,
-                                          color,
-                                        ),
-                                        if (index < upcomingEvents.length - 1)
-                                          const SizedBox(height: 12),
-                                      ],
-                                    );
-                                  },
-                                )
-                              : Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.event_note,
-                                        size: 48,
-                                        color: ColorManager.textLight,
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        'No upcoming events',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: ColorManager.textMedium,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Check back later for new events',
-                                        style: TextStyle(
-                                          color: ColorManager.textLight,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                        ),
-                      ],
+                    const SizedBox(width: 24),
+                    // Upcoming events
+                    Expanded(
+                      flex: 2,
+                      child: _buildUpcomingEventsSection(upcomingEvents),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
 
               const SizedBox(height: 32),
 
               // Testimonials section
               if (testimonials.isNotEmpty) ...[
-                _buildTestimonialsSection(testimonials),
+                _buildTestimonialsSection(testimonials, isSmallScreen),
                 const SizedBox(height: 32),
               ],
             ],
@@ -652,93 +359,726 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
     );
   }
 
-  Widget _buildMembershipPromoCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            ColorManager.secondary.withOpacity(0.9),
-            ColorManager.secondary,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: ColorManager.secondary.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+  Widget _buildWelcomeSection(String userName, bool isSmallScreen) {
+    if (isSmallScreen) {
+      // Mobile layout - Stack vertically
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Welcome, $userName!',
+            style: TextStyle(
+              fontSize: 24, // Smaller font on mobile
+              fontWeight: FontWeight.bold,
+              color: ColorManager.textDark,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Your learning journey continues. Here\'s what\'s new today.',
+            style: TextStyle(
+              fontSize: 14,
+              color: ColorManager.textMedium,
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const AllCoursesScreen(userType: "student"),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Join Course'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ColorManager.primary,
+                foregroundColor: Colors.white,
+                elevation: 2,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
           ),
         ],
-      ),
-      child: Row(
+      );
+    } else {
+      // Desktop/tablet layout - Keep original row
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.card_membership,
-              color: Colors.white,
-              size: 40,
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Unlock Premium Benefits',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Welcome, $userName!',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: ColorManager.textDark,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Get discounts on courses, access to exclusive content, and more!',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 13,
-                  ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Your learning journey continues. Here\'s what\'s new today.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: ColorManager.textMedium,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          ElevatedButton(
+          ElevatedButton.icon(
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const MembershipScreen(),
+                  builder: (context) =>
+                      const AllCoursesScreen(userType: "student"),
                 ),
               );
             },
+            icon: const Icon(Icons.add),
+            label: const Text('Join Course'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: ColorManager.secondary,
+              backgroundColor: ColorManager.primary,
+              foregroundColor: Colors.white,
+              elevation: 2,
               padding: const EdgeInsets.symmetric(
-                horizontal: 16,
+                horizontal: 20,
                 vertical: 12,
               ),
-            ),
-            child: const Text(
-              'JOIN NOW',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
           ),
         ],
+      );
+    }
+  }
+
+  Widget _buildMembershipPromoCard(bool isSmallScreen) {
+    if (isSmallScreen) {
+      // Mobile layout
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              ColorManager.secondary.withOpacity(0.9),
+              ColorManager.secondary,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: ColorManager.secondary.withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.card_membership,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Unlock Premium Benefits',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Get discounts on courses, access to exclusive content, and more!',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MembershipScreen(),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: ColorManager.secondary,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+                child: const Text(
+                  'JOIN NOW',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Tablet/Desktop layout
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              ColorManager.secondary.withOpacity(0.9),
+              ColorManager.secondary,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: ColorManager.secondary.withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.card_membership,
+                color: Colors.white,
+                size: 40,
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Unlock Premium Benefits',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Get discounts on courses, access to exclusive content, and more!',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MembershipScreen(),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: ColorManager.secondary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              child: const Text(
+                'JOIN NOW',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Widget _buildQuickActionsRow(bool isSmallScreen) {
+    if (isSmallScreen) {
+      // Mobile layout - grid with 2 items per row
+      return GridView.count(
+        crossAxisCount: 2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 1.5,
+        children: [
+          _buildQuickActionButton(
+            'Continue Learning',
+            Icons.play_circle_outline,
+            ColorManager.primary,
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const AllCoursesScreen(userType: "student"),
+                ),
+              );
+            },
+          ),
+          _buildQuickActionButton(
+            'View Assignments',
+            Icons.assignment_outlined,
+            ColorManager.warning,
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const AllCoursesScreen(userType: "student"),
+                ),
+              );
+            },
+          ),
+          _buildQuickActionButton(
+            'Join Live Class',
+            Icons.videocam_outlined,
+            ColorManager.error,
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const AllCoursesScreen(userType: "student"),
+                ),
+              );
+            },
+          ),
+          _buildQuickActionButton(
+            'View Schedule',
+            Icons.calendar_today_outlined,
+            ColorManager.info,
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const AllCoursesScreen(userType: "student"),
+                ),
+              );
+            },
+          ),
+        ],
+      );
+    } else {
+      // Tablet/Desktop layout - original row
+      return Row(
+        children: [
+          _buildQuickActionButton(
+            'Continue Learning',
+            Icons.play_circle_outline,
+            ColorManager.primary,
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const AllCoursesScreen(userType: "student"),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 16),
+          _buildQuickActionButton(
+            'View Assignments',
+            Icons.assignment_outlined,
+            ColorManager.warning,
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const AllCoursesScreen(userType: "student"),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 16),
+          _buildQuickActionButton(
+            'Join Live Class',
+            Icons.videocam_outlined,
+            ColorManager.error,
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const AllCoursesScreen(userType: "student"),
+                ),
+              );
+            },
+          ),
+        ],
+      );
+    }
+  }
+
+  Widget _buildEnrolledCoursesSection(
+      List enrolledCourses, bool isSmallScreen) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: ColorManager.dark.withOpacity(0.05),
+            spreadRadius: 1,
+            blurRadius: 5,
+          ),
+        ],
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Continue Your Learning',
+                style: TextStyle(
+                  fontSize: isSmallScreen ? 16 : 18,
+                  fontWeight: FontWeight.bold,
+                  color: ColorManager.textDark,
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          const AllCoursesScreen(userType: "student"),
+                    ),
+                  );
+                },
+                child: Text(
+                  'View All',
+                  style: TextStyle(
+                    color: ColorManager.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Display the first 3 enrolled courses (or fewer if less than 3)
+          ...List.generate(
+            enrolledCourses.length > 3 ? 3 : enrolledCourses.length,
+            (index) {
+              final course = enrolledCourses[index];
+              final courseName = course['Course Name'] ?? 'Unknown Course';
+              final courseDescription = course['Course Discription'] ?? '';
+              final progress = course['progress'] as double;
+              final lastAccessed = course['lastAccessed'] as DateTime?;
+              final color = [
+                ColorManager.primary,
+                ColorManager.secondary,
+                ColorManager.info,
+              ][index % 3];
+
+              String moduleText = 'In progress';
+              if (courseDescription.isNotEmpty) {
+                final words = courseDescription.split(' ');
+                moduleText = words.length > 5
+                    ? 'Module: ${words.take(5).join(' ')}...'
+                    : courseDescription;
+              }
+
+              return Column(
+                children: [
+                  _buildCourseProgressItem(
+                    courseName,
+                    moduleText,
+                    progress,
+                    color,
+                    lastAccessed,
+                    isSmallScreen,
+                  ),
+                  if (index <
+                      ((enrolledCourses.length > 3)
+                              ? 3
+                              : enrolledCourses.length) -
+                          1)
+                    const SizedBox(height: 16),
+                ],
+              );
+            },
+          ),
+          if (enrolledCourses.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.school_outlined,
+                      size: 48,
+                      color: ColorManager.textLight,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No courses enrolled yet',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: ColorManager.textMedium,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Join a course to start your learning journey',
+                      style: TextStyle(
+                        color: ColorManager.textLight,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                const AllCoursesScreen(userType: "student"),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ColorManager.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Browse Courses'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatisticsSection(
+      int enrolledCount, int completedCount, int testsCount) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Your Statistics',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: ColorManager.textDark,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                'Enrolled Courses',
+                '$enrolledCount',
+                Icons.book_outlined,
+                ColorManager.primary,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildStatCard(
+                'Completed',
+                '$completedCount',
+                Icons.check_circle_outline,
+                ColorManager.success,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                'Certificates',
+                '$completedCount',
+                Icons.card_membership_outlined,
+                ColorManager.warning,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildStatCard(
+                'Tests Taken',
+                '$testsCount',
+                Icons.access_time_outlined,
+                ColorManager.info,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUpcomingEventsSection(List upcomingEvents) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Upcoming Schedule',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: ColorManager.textDark,
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const AllCoursesScreen(userType: "student"),
+                  ),
+                );
+              },
+              child: Text(
+                'View All',
+                style: TextStyle(
+                  color: ColorManager.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          height: 320,
+          child: upcomingEvents.isNotEmpty
+              ? ListView.builder(
+                  padding: EdgeInsets.zero,
+                  itemCount:
+                      upcomingEvents.length > 4 ? 4 : upcomingEvents.length,
+                  itemBuilder: (context, index) {
+                    final event = upcomingEvents[index];
+                    final String category = event['category'] ?? 'General';
+                    final String title = event['title'] ?? 'Event';
+                    final String time = event['time'] ?? 'Upcoming';
+                    final Color color = _getCategoryColor(category);
+
+                    return Column(
+                      children: [
+                        _buildEventCard(
+                          category,
+                          title,
+                          time,
+                          color,
+                        ),
+                        if (index < upcomingEvents.length - 1)
+                          const SizedBox(height: 12),
+                      ],
+                    );
+                  },
+                )
+              : Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.event_note,
+                        size: 48,
+                        color: ColorManager.textLight,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No upcoming events',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: ColorManager.textMedium,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Check back later for new events',
+                        style: TextStyle(
+                          color: ColorManager.textLight,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+      ],
     );
   }
 
@@ -795,12 +1135,15 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        announcement['title'] ?? 'Announcement',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: ColorManager.textDark,
-                          fontSize: 16,
+                      Expanded(
+                        child: Text(
+                          announcement['title'] ?? 'Announcement',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: ColorManager.textDark,
+                            fontSize: 16,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       Text(
@@ -828,7 +1171,7 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
     );
   }
 
-  Widget _buildTestimonialsSection(List testimonials) {
+  Widget _buildTestimonialsSection(List testimonials, bool isSmallScreen) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -855,14 +1198,17 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
           ),
           const SizedBox(height: 20),
           SizedBox(
-            height: 200,
+            height: 220, // Increased height for mobile
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: testimonials.length,
               itemBuilder: (context, index) {
                 final testimonial = testimonials[index];
+                // Adjust width for mobile
+                final cardWidth = isSmallScreen ? 280.0 : 300.0;
+
                 return Container(
-                  width: 300,
+                  width: cardWidth,
                   margin: const EdgeInsets.only(right: 16),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -920,39 +1266,43 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
                                   ),
                           ),
                           const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                testimonial['name'] ?? 'Student',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: ColorManager.textDark,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  testimonial['name'] ?? 'Student',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: ColorManager.textDark,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                              Text(
-                                testimonial['courseName'] ?? 'Student',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: ColorManager.textMedium,
+                                Text(
+                                  testimonial['courseName'] ?? 'Student',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: ColorManager.textMedium,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                            ],
-                          ),
-                          const Spacer(),
-                          Row(
-                            children: List.generate(
-                              5,
-                              (i) => Icon(
-                                i < (testimonial['rating'] ?? 5)
-                                    ? Icons.star
-                                    : Icons.star_border,
-                                size: 16,
-                                color: Colors.amber,
-                              ),
+                              ],
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: List.generate(
+                          5,
+                          (i) => Icon(
+                            i < (testimonial['rating'] ?? 5)
+                                ? Icons.star
+                                : Icons.star_border,
+                            size: 16,
+                            color: Colors.amber,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Expanded(
@@ -998,6 +1348,7 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
             ],
           ),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
@@ -1013,8 +1364,11 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
                 style: TextStyle(
                   color: ColorManager.textDark,
                   fontWeight: FontWeight.w500,
+                  fontSize: 13,
                 ),
                 textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -1029,6 +1383,7 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
     double progress,
     Color color,
     DateTime? lastAccessed,
+    bool isSmallScreen,
   ) {
     String lastAccessedText = 'Not started yet';
     if (lastAccessed != null) {
@@ -1063,7 +1418,7 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
                     Text(
                       title,
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: isSmallScreen ? 14 : 16,
                         fontWeight: FontWeight.w600,
                         color: ColorManager.textDark,
                       ),
@@ -1074,7 +1429,7 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: isSmallScreen ? 12 : 13,
                         color: ColorManager.textMedium,
                       ),
                       maxLines: 1,
@@ -1102,32 +1457,69 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
             borderRadius: BorderRadius.circular(4),
           ),
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              TextButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          const AllCoursesScreen(userType: "student"),
+          // For mobile, stack the continue button and last accessed text
+          if (isSmallScreen)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const AllCoursesScreen(userType: "student"),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.play_circle_outline, size: 18),
+                    label: const Text('Continue'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: color,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                     ),
-                  );
-                },
-                icon: const Icon(Icons.play_circle_outline, size: 18),
-                label: const Text('Continue'),
-                style: TextButton.styleFrom(
-                  foregroundColor: color,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
                 ),
-              ),
-              Text(
-                lastAccessedText,
-                style: TextStyle(fontSize: 12, color: ColorManager.textLight),
-              ),
-            ],
-          ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Text(
+                    lastAccessedText,
+                    style:
+                        TextStyle(fontSize: 11, color: ColorManager.textLight),
+                  ),
+                ),
+              ],
+            )
+          else
+            // For desktop/tablet, keep the original row layout
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            const AllCoursesScreen(userType: "student"),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.play_circle_outline, size: 18),
+                  label: const Text('Continue'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: color,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                ),
+                Text(
+                  lastAccessedText,
+                  style: TextStyle(fontSize: 12, color: ColorManager.textLight),
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -1242,6 +1634,8 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
                     fontWeight: FontWeight.w600,
                     color: ColorManager.textDark,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Row(

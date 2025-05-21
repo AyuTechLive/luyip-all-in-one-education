@@ -163,8 +163,11 @@ class _StudentIDCardScreenState extends State<StudentIDCardScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            icon: const Icon(Icons.arrow_back),
-            label: const Text('Go Back'),
+            // icon: const Icon(Icons.arrow_back),
+            label: const Text(
+              'Buy Membership',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),

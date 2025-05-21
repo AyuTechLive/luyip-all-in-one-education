@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:luyip_website_edu/Courses/addvideo.dart';
 import 'package:luyip_website_edu/Courses/allcourses.dart';
 import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/manage_test.dart';
+import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/payment_content.dart';
 import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/students.dart';
 import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/teachers.dart';
 import 'package:luyip_website_edu/admin_dashboard/dummyadmin.dart';
+import 'package:luyip_website_edu/admin_dashboard/payment_screen.dart';
 import 'package:luyip_website_edu/auth/auth_service.dart';
 import 'package:luyip_website_edu/auth/loginscreen.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
@@ -53,7 +55,7 @@ class _AdminDashboardContainerState extends State<AdminDashboardContainer> {
       case 'Schedule':
         return const ScheduleContent();
       case 'Payments':
-        return const PaymentsContent();
+        return const PaymentsScreen();
       case 'Notifications':
         return const NotificationsContent();
       case 'Settings':

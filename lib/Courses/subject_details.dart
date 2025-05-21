@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:luyip_website_edu/Courses/course_management_screen.dart';
+import 'package:luyip_website_edu/Courses/pdfviewer/pdfviewer.dart';
 import 'package:luyip_website_edu/Courses/videoplayer.dart';
 import 'package:luyip_website_edu/exams/test_list_page.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
 import 'package:luyip_website_edu/helpers/utils.dart';
+import 'dart:html' as html;
+import 'package:flutter/foundation.dart' show kIsWeb;
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:ui' as ui;
+
+// The updated import for course content management
 
 class SubjectDetailPage extends StatefulWidget {
   final String subjectId;
@@ -32,7 +40,9 @@ class _SubjectDetailPageState extends State<SubjectDetailPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this); // Changed to 6 tabs
+    _tabController = TabController(
+        length: 4,
+        vsync: this); // Changed to 4 tabs: Lectures, Notes, DPP, Tests
     _contentFuture = _fetchContent();
     _fetchUserRole();
   }
@@ -106,14 +116,45 @@ class _SubjectDetailPageState extends State<SubjectDetailPage>
     );
   }
 
+  void _navigateToPdfViewer(String pdfUrl, String title) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PdfViewerScreen(
+          pdfUrl: pdfUrl,
+          title: title,
+        ),
+      ),
+    );
+  }
+
+  // Navigate to content management (admin only)
+  void _navigateToContentManagement() {
+    if (userRole == 'admin' || userRole == 'teacher') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CourseContentManagement(
+            courseName: widget.courseName,
+          ),
+        ),
+      ).then((_) {
+        // Refresh content when returning from management page
+        setState(() {
+          _contentFuture = _fetchContent();
+        });
+      });
+    } else {
+      Utils().toastMessage('You do not have permission to manage content');
+    }
+  }
+
   Future<Map<String, List<Map<String, dynamic>>>> _fetchContent() async {
     Map<String, List<Map<String, dynamic>>> content = {
       'lectures': [],
       'notes': [],
       'dpp': [],
-      'dppPdf': [],
-      'dppVideos': [],
-      'tests': [], // Added tests list
+      'tests': [],
     };
 
     try {
@@ -139,6 +180,7 @@ class _SubjectDetailPageState extends State<SubjectDetailPage>
               'videoUrl': value['Video Link'] ?? '',
               'timestamp': value['timestamp'] ?? 0,
               'lectureName': key.toString(),
+              'docKey': key.toString(), // Added for edit/delete functionality
             });
           }
         });
@@ -177,6 +219,7 @@ class _SubjectDetailPageState extends State<SubjectDetailPage>
                 'durationMinutes': value['durationMinutes'] ?? 0,
                 'isActive': isActive,
                 'createdAt': value['createdAt'] ?? 0,
+                'docKey': key.toString(), // Added for edit/delete functionality
               });
             }
           }
@@ -207,89 +250,22 @@ class _SubjectDetailPageState extends State<SubjectDetailPage>
           if (value is Map) {
             content['dpp']!.add({
               'id': value['id'] ?? key.toString(),
-              'title': value['Title'] ?? 'No Title',
-              'subtitle': value['Subtitle'] ?? '',
-              'pdfUrl': value['PDF Link'] ?? '',
+              'title': value['title'] ?? value['Title'] ?? 'No Title',
+              'description': value['description'] ?? value['Subtitle'] ?? '',
+              'url': value['url'] ?? value['PDF Link'] ?? '',
               'timestamp': value['timestamp'] ?? 0,
-              'dppName': key.toString(),
+              'docKey': key.toString(), // Added for edit/delete functionality
             });
           }
         });
 
-        // Sort DPP by id
-        content['dpp']!.sort(
-          (a, b) => int.parse(
-            a['id'].toString(),
-          ).compareTo(int.parse(b['id'].toString())),
-        );
-      }
-
-      // Fetch DPP PDF
-      final dppPdfRef = FirebaseDatabase.instance
-          .ref(widget.courseName)
-          .child('SUBJECTS')
-          .child(widget.subjectId)
-          .child('DPP PDF');
-
-      DatabaseEvent dppPdfEvent = await dppPdfRef.once();
-
-      if (dppPdfEvent.snapshot.value != null) {
-        Map<dynamic, dynamic> dppPdfData =
-            dppPdfEvent.snapshot.value as Map<dynamic, dynamic>;
-
-        dppPdfData.forEach((key, value) {
-          if (value is Map) {
-            content['dppPdf']!.add({
-              'id': value['id'] ?? key.toString(),
-              'title': value['Title'] ?? 'No Title',
-              'subtitle': value['Subtitle'] ?? '',
-              'pdfUrl': value['PDF Link'] ?? '',
-              'timestamp': value['timestamp'] ?? 0,
-              'pdfName': key.toString(),
-            });
+        // Sort DPP by timestamp or id
+        content['dpp']!.sort((a, b) {
+          if (a['timestamp'] != 0 && b['timestamp'] != 0) {
+            return (b['timestamp'] as int).compareTo(a['timestamp'] as int);
           }
+          return a['id'].toString().compareTo(b['id'].toString());
         });
-
-        // Sort DPP PDF by id
-        content['dppPdf']!.sort(
-          (a, b) => int.parse(
-            a['id'].toString(),
-          ).compareTo(int.parse(b['id'].toString())),
-        );
-      }
-
-      // Fetch DPP VIDEOS
-      final dppVideosRef = FirebaseDatabase.instance
-          .ref(widget.courseName)
-          .child('SUBJECTS')
-          .child(widget.subjectId)
-          .child('DPP VIDEOS');
-
-      DatabaseEvent dppVideosEvent = await dppVideosRef.once();
-
-      if (dppVideosEvent.snapshot.value != null) {
-        Map<dynamic, dynamic> dppVideosData =
-            dppVideosEvent.snapshot.value as Map<dynamic, dynamic>;
-
-        dppVideosData.forEach((key, value) {
-          if (value is Map) {
-            content['dppVideos']!.add({
-              'id': value['id'] ?? key.toString(),
-              'title': value['Title'] ?? 'No Title',
-              'subtitle': value['Subtitle'] ?? '',
-              'videoUrl': value['Video Link'] ?? '',
-              'timestamp': value['timestamp'] ?? 0,
-              'videoName': key.toString(),
-            });
-          }
-        });
-
-        // Sort DPP Videos by id
-        content['dppVideos']!.sort(
-          (a, b) => int.parse(
-            a['id'].toString(),
-          ).compareTo(int.parse(b['id'].toString())),
-        );
       }
 
       // Fetch Notes
@@ -309,21 +285,22 @@ class _SubjectDetailPageState extends State<SubjectDetailPage>
           if (value is Map) {
             content['notes']!.add({
               'id': value['id'] ?? key.toString(),
-              'title': value['Title'] ?? 'No Title',
-              'subtitle': value['Subtitle'] ?? '',
-              'pdfUrl': value['PDF Link'] ?? '',
+              'title': value['title'] ?? value['Title'] ?? 'No Title',
+              'description': value['description'] ?? value['Subtitle'] ?? '',
+              'url': value['url'] ?? value['PDF Link'] ?? '',
               'timestamp': value['timestamp'] ?? 0,
-              'noteName': key.toString(),
+              'docKey': key.toString(), // Added for edit/delete functionality
             });
           }
         });
 
-        // Sort Notes by id
-        content['notes']!.sort(
-          (a, b) => int.parse(
-            a['id'].toString(),
-          ).compareTo(int.parse(b['id'].toString())),
-        );
+        // Sort Notes by timestamp or id
+        content['notes']!.sort((a, b) {
+          if (a['timestamp'] != 0 && b['timestamp'] != 0) {
+            return (b['timestamp'] as int).compareTo(a['timestamp'] as int);
+          }
+          return a['id'].toString().compareTo(b['id'].toString());
+        });
       }
 
       return content;
@@ -332,18 +309,6 @@ class _SubjectDetailPageState extends State<SubjectDetailPage>
       return content;
     }
   }
-
-  // void _launchURL(String url) async {
-  //   try {
-  //     if (await canLaunch(url)) {
-  //       await launch(url);
-  //     } else {
-  //       Utils().toastMessage('Could not launch $url');
-  //     }
-  //   } catch (e) {
-  //     Utils().toastMessage('Error launching URL: ${e.toString()}');
-  //   }
-  // }
 
   Widget _buildContentList(List<Map<String, dynamic>> items, String type) {
     if (items.isEmpty) {
@@ -381,75 +346,110 @@ class _SubjectDetailPageState extends State<SubjectDetailPage>
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: Container(
-              decoration: BoxDecoration(
-                color: _getColorForContentType(type).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              padding: const EdgeInsets.all(8),
-              child: Icon(
-                _getIconForContentType(type),
-                color: _getColorForContentType(type),
-                size: 24,
-              ),
-            ),
-            title: Text(
-              item['title'] ?? 'No Title',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: ColorManager.textDark,
-              ),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (item['subtitle'] != null &&
-                    item['subtitle'].toString().isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      item['subtitle'],
-                      style: TextStyle(color: ColorManager.textMedium),
-                    ),
+          child: Column(
+            children: [
+              ListTile(
+                contentPadding: const EdgeInsets.all(16),
+                leading: Container(
+                  decoration: BoxDecoration(
+                    color: _getColorForContentType(type).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    type == 'lectures' || type == 'dppVideos'
-                        ? 'Click to watch video'
-                        : 'Click to view PDF',
-                    style: TextStyle(color: ColorManager.primary, fontSize: 12),
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(
+                    _getIconForContentType(type),
+                    color: _getColorForContentType(type),
+                    size: 24,
                   ),
                 ),
-              ],
-            ),
-            trailing: Icon(
-              Icons.play_circle_outline,
-              color: ColorManager.primary,
-            ),
-            onTap: () {
-              if (type == 'lectures' || type == 'dppVideos') {
-                if (item['videoUrl'] != null &&
-                    item['videoUrl'].toString().isNotEmpty) {
-                  _navigateToVideoPlayer(
-                    item['videoUrl'],
-                    item['title'] ?? 'Video Player',
-                    item['subtitle'] ?? '',
-                  );
-                } else {
-                  Utils().toastMessage('Video URL not available');
-                }
-              } else {
-                if (item['pdfUrl'] != null &&
-                    item['pdfUrl'].toString().isNotEmpty) {
-                  // _launchURL(item['pdfUrl']);
-                } else {
-                  Utils().toastMessage('PDF URL not available');
-                }
-              }
-            },
+                title: Text(
+                  item['title'] ?? 'No Title',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: ColorManager.textDark,
+                  ),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (item['description'] != null &&
+                        item['description'].toString().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          item['description'],
+                          style: TextStyle(color: ColorManager.textMedium),
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        type == 'lectures'
+                            ? 'Click to watch video'
+                            : 'Click to view PDF',
+                        style: TextStyle(
+                            color: ColorManager.primary, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                trailing: Icon(
+                  type == 'lectures'
+                      ? Icons.play_circle_outline
+                      : Icons.picture_as_pdf,
+                  color: ColorManager.primary,
+                ),
+                onTap: () {
+                  if (type == 'lectures') {
+                    if (item['videoUrl'] != null &&
+                        item['videoUrl'].toString().isNotEmpty) {
+                      _navigateToVideoPlayer(
+                        item['videoUrl'],
+                        item['title'] ?? 'Video Player',
+                        item['subtitle'] ?? item['description'] ?? '',
+                      );
+                    } else {
+                      Utils().toastMessage('Video URL not available');
+                    }
+                  } else {
+                    // For Notes and DPP - PDF viewing
+                    if (item['url'] != null &&
+                        item['url'].toString().isNotEmpty) {
+                      _navigateToPdfViewer(
+                          item['url'], item['title'] ?? 'PDF Viewer');
+                    } else {
+                      Utils().toastMessage('PDF URL not available');
+                    }
+                  }
+                },
+              ),
+
+              // Show admin/teacher controls for content management
+              if (userRole == 'admin' || userRole == 'teacher')
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _navigateToContentManagement(),
+                        icon: const Icon(Icons.edit, size: 16),
+                        label: const Text('Manage Content'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: ColorManager.primary,
+                          side: BorderSide(color: ColorManager.primary),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          minimumSize: const Size(120, 32),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
         );
       },
@@ -626,10 +626,6 @@ class _SubjectDetailPageState extends State<SubjectDetailPage>
         return Icons.notes;
       case 'dpp':
         return Icons.assignment;
-      case 'dppPdf':
-        return Icons.picture_as_pdf;
-      case 'dppVideos':
-        return Icons.play_circle_fill;
       case 'tests':
         return Icons.quiz;
       default:
@@ -645,10 +641,6 @@ class _SubjectDetailPageState extends State<SubjectDetailPage>
         return Colors.green;
       case 'dpp':
         return Colors.purple;
-      case 'dppPdf':
-        return Colors.red;
-      case 'dppVideos':
-        return Colors.orange;
       case 'tests':
         return Colors.amber;
       default:
@@ -671,19 +663,25 @@ class _SubjectDetailPageState extends State<SubjectDetailPage>
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: IconThemeData(color: ColorManager.textDark),
+        actions: [
+          // Add management button for admins/teachers
+          if (userRole == 'admin' || userRole == 'teacher')
+            IconButton(
+              icon: const Icon(Icons.settings),
+              tooltip: 'Manage Content',
+              onPressed: _navigateToContentManagement,
+            ),
+        ],
         bottom: TabBar(
           controller: _tabController,
-          isScrollable: true,
           labelColor: ColorManager.primary,
           unselectedLabelColor: ColorManager.textMedium,
           indicatorColor: ColorManager.primary,
           tabs: const [
             Tab(text: 'Lectures'),
             Tab(text: 'Notes'),
-            Tab(text: 'Tests'), // Added Tests tab
             Tab(text: 'DPP'),
-            Tab(text: 'DPP PDF'),
-            Tab(text: 'DPP VIDEOS'),
+            Tab(text: 'Tests'),
           ],
         ),
       ),
@@ -709,10 +707,8 @@ class _SubjectDetailPageState extends State<SubjectDetailPage>
               {
                 'lectures': [],
                 'notes': [],
-                'tests': [], // Added tests
                 'dpp': [],
-                'dppPdf': [],
-                'dppVideos': [],
+                'tests': [],
               };
 
           return TabBarView(
@@ -720,11 +716,8 @@ class _SubjectDetailPageState extends State<SubjectDetailPage>
             children: [
               _buildContentList(content['lectures']!, 'lectures'),
               _buildContentList(content['notes']!, 'notes'),
-              _buildContentList(
-                  content['tests']!, 'tests'), // Added tests tab content
               _buildContentList(content['dpp']!, 'dpp'),
-              _buildContentList(content['dppPdf']!, 'dppPdf'),
-              _buildContentList(content['dppVideos']!, 'dppVideos'),
+              _buildContentList(content['tests']!, 'tests'),
             ],
           );
         },

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:luyip_website_edu/Courses/addcourse.dart';
 import 'package:luyip_website_edu/Courses/course_deatils.dart';
+import 'package:luyip_website_edu/Courses/course_details/course_details.dart';
 import 'package:luyip_website_edu/Courses/widget/coursecardview.dart';
 import 'package:luyip_website_edu/helpers/userauthtype.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';

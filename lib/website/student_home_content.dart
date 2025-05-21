@@ -3,9 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
-import 'package:luyip_website_edu/helpers/roundbutton.dart';
 import 'package:luyip_website_edu/helpers/utils.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:typed_data';
 import 'package:intl/intl.dart';
 
 class WebsiteGeneralAdminPage extends StatefulWidget {
@@ -23,6 +24,16 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
   bool _isLoading = false;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
+
+  // Banners
+  final TextEditingController _bannerTitleController = TextEditingController();
+  final TextEditingController _bannerSubtitleController =
+      TextEditingController();
+  final TextEditingController _bannerCtaController = TextEditingController();
+  String _selectedBannerColor = 'purple';
+  XFile? _pickedBannerImage;
+  Uint8List? _webBannerImage;
+  File? _bannerImageFile;
 
   // Announcements
   final TextEditingController _announcementTitleController =
@@ -45,18 +56,32 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
   final TextEditingController _testimonialContentController =
       TextEditingController();
   double _testimonialRating = 5.0;
-  File? _testimonialPhoto;
+  XFile? _pickedTestimonialPhoto;
+  Uint8List? _webTestimonialPhoto;
+  File? _testimonialPhotoFile;
+
+  // Available banner colors
+  final List<Map<String, dynamic>> _bannerColors = [
+    {'name': 'Purple', 'value': 'purple', 'color': Color(0xFF5E4DCD)},
+    {'name': 'Blue', 'value': 'blue', 'color': Colors.blue.shade600},
+    {'name': 'Green', 'value': 'green', 'color': Colors.green.shade600},
+    {'name': 'Orange', 'value': 'orange', 'color': Colors.orange.shade600},
+    {'name': 'Pink', 'value': 'pink', 'color': Colors.pink.shade600},
+  ];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this); // 4 tabs now
     _websiteDataFuture = _fetchWebsiteData();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _bannerTitleController.dispose();
+    _bannerSubtitleController.dispose();
+    _bannerCtaController.dispose();
     _announcementTitleController.dispose();
     _announcementContentController.dispose();
     _eventTitleController.dispose();
@@ -70,6 +95,7 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
 
   Future<Map<String, dynamic>> _fetchWebsiteData() async {
     Map<String, dynamic> websiteData = {
+      'banners': [],
       'announcements': [],
       'upcomingEvents': [],
       'testimonials': [],
@@ -82,6 +108,7 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         websiteData = {
+          'banners': data['banners'] ?? [],
           'announcements': data['announcements'] ?? [],
           'upcomingEvents': data['upcomingEvents'] ?? [],
           'testimonials': data['testimonials'] ?? [],
@@ -121,25 +148,93 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
     });
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickBannerImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
     if (pickedFile != null) {
-      setState(() {
-        _testimonialPhoto = File(pickedFile.path);
-      });
+      _pickedBannerImage = pickedFile;
+
+      if (kIsWeb) {
+        // For web platform
+        _webBannerImage = await pickedFile.readAsBytes();
+        setState(() {});
+      } else {
+        // For mobile platforms
+        setState(() {
+          _bannerImageFile = File(pickedFile.path);
+        });
+      }
     }
   }
 
-  Future<String?> _uploadImage() async {
-    if (_testimonialPhoto == null) return null;
+  Future<String?> _uploadBannerImage() async {
+    if (_pickedBannerImage == null) return null;
+
+    try {
+      final fileName = 'banner_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final ref = _storage.ref().child('banners/$fileName');
+
+      UploadTask uploadTask;
+      if (kIsWeb) {
+        // For web, use the bytes directly
+        uploadTask = ref.putData(
+          await _pickedBannerImage!.readAsBytes(),
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+      } else {
+        // For mobile platforms
+        uploadTask = ref.putFile(_bannerImageFile!);
+      }
+
+      final snapshot = await uploadTask;
+      return await snapshot.ref.getDownloadURL();
+    } catch (e) {
+      print('Error uploading image: $e');
+      return null;
+    }
+  }
+
+  Future<void> _pickTestimonialImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      _pickedTestimonialPhoto = pickedFile;
+
+      if (kIsWeb) {
+        // For web platform
+        _webTestimonialPhoto = await pickedFile.readAsBytes();
+        setState(() {});
+      } else {
+        // For mobile platforms
+        setState(() {
+          _testimonialPhotoFile = File(pickedFile.path);
+        });
+      }
+    }
+  }
+
+  Future<String?> _uploadTestimonialImage() async {
+    if (_pickedTestimonialPhoto == null) return null;
 
     try {
       final fileName =
           'testimonial_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final ref = _storage.ref().child('testimonials/$fileName');
-      final uploadTask = ref.putFile(_testimonialPhoto!);
+
+      UploadTask uploadTask;
+      if (kIsWeb) {
+        // For web, use the bytes directly
+        uploadTask = ref.putData(
+          await _pickedTestimonialPhoto!.readAsBytes(),
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+      } else {
+        // For mobile platforms
+        uploadTask = ref.putFile(_testimonialPhotoFile!);
+      }
+
       final snapshot = await uploadTask;
       return await snapshot.ref.getDownloadURL();
     } catch (e) {
@@ -181,7 +276,9 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
           labelColor: ColorManager.primary,
           unselectedLabelColor: ColorManager.textMedium,
           indicatorColor: ColorManager.primary,
+          isScrollable: true, // Added to accommodate more tabs
           tabs: const [
+            Tab(text: 'Banners'),
             Tab(text: 'Announcements'),
             Tab(text: 'Upcoming Events'),
             Tab(text: 'Testimonials'),
@@ -209,6 +306,7 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
           }
 
           final websiteData = snapshot.data!;
+          final banners = websiteData['banners'] as List;
           final announcements = websiteData['announcements'] as List;
           final upcomingEvents = websiteData['upcomingEvents'] as List;
           final testimonials = websiteData['testimonials'] as List;
@@ -216,6 +314,9 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
           return TabBarView(
             controller: _tabController,
             children: [
+              // Banners Tab
+              _buildBannersTab(banners, websiteData),
+
               // Announcements Tab
               _buildAnnouncementsTab(announcements, websiteData),
 
@@ -229,6 +330,495 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
         },
       ),
     );
+  }
+
+  Widget _buildBannersTab(List banners, Map<String, dynamic> websiteData) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Manage Homepage Banners',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: ColorManager.textDark,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Add New Banner Form
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Add New Banner',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: ColorManager.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          children: [
+                            TextField(
+                              controller: _bannerTitleController,
+                              decoration: InputDecoration(
+                                labelText: 'Banner Title',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _bannerSubtitleController,
+                              decoration: InputDecoration(
+                                labelText: 'Banner Subtitle',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _bannerCtaController,
+                              decoration: InputDecoration(
+                                labelText: 'Call to Action Button Text',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<String>(
+                              decoration: InputDecoration(
+                                labelText: 'Banner Color',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              value: _selectedBannerColor,
+                              items: _bannerColors.map((colorData) {
+                                return DropdownMenuItem<String>(
+                                  value: colorData['value'],
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 20,
+                                        height: 20,
+                                        decoration: BoxDecoration(
+                                          color: colorData['color'],
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(colorData['name']),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (String? value) {
+                                setState(() {
+                                  _selectedBannerColor = value ?? 'purple';
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      GestureDetector(
+                        onTap: _pickBannerImage,
+                        child: Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            color: ColorManager.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: ColorManager.primary.withOpacity(0.5),
+                            ),
+                          ),
+                          child: _pickedBannerImage != null
+                              ? Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: kIsWeb
+                                          ? Image.memory(
+                                              _webBannerImage!,
+                                              fit: BoxFit.cover,
+                                              width: 120,
+                                              height: 120,
+                                            )
+                                          : Image.file(
+                                              _bannerImageFile!,
+                                              fit: BoxFit.cover,
+                                              width: 120,
+                                              height: 120,
+                                            ),
+                                    ),
+                                    Positioned(
+                                      right: 0,
+                                      top: 0,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withOpacity(0.6),
+                                          borderRadius: BorderRadius.only(
+                                            bottomLeft: Radius.circular(8),
+                                            topRight: Radius.circular(11),
+                                          ),
+                                        ),
+                                        child: IconButton(
+                                          icon: Icon(
+                                            Icons.close,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                          padding: EdgeInsets.all(4),
+                                          constraints: BoxConstraints(),
+                                          onPressed: () {
+                                            setState(() {
+                                              _pickedBannerImage = null;
+                                              _bannerImageFile = null;
+                                              _webBannerImage = null;
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.add_photo_alternate,
+                                      color: ColorManager.primary,
+                                      size: 36,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Banner Image',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: ColorManager.primary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      _isLoading
+                          ? CircularProgressIndicator(
+                              color: ColorManager.primary,
+                            )
+                          : ElevatedButton.icon(
+                              onPressed: () async {
+                                if (_bannerTitleController.text.isEmpty ||
+                                    _bannerSubtitleController.text.isEmpty ||
+                                    _bannerCtaController.text.isEmpty) {
+                                  Utils().toastMessage(
+                                      'Please fill in all fields');
+                                  return;
+                                }
+
+                                setState(() {
+                                  _isLoading = true;
+                                });
+
+                                String? imageUrl;
+                                if (_pickedBannerImage != null) {
+                                  imageUrl = await _uploadBannerImage();
+                                }
+
+                                final newBanner = {
+                                  'title': _bannerTitleController.text,
+                                  'subtitle': _bannerSubtitleController.text,
+                                  'cta': _bannerCtaController.text,
+                                  'color': _selectedBannerColor,
+                                  'imageUrl': imageUrl ?? '',
+                                  'timestamp':
+                                      DateTime.now().millisecondsSinceEpoch,
+                                };
+
+                                List updatedBanners = [...banners, newBanner];
+                                final updatedData = {
+                                  ...websiteData,
+                                  'banners': updatedBanners,
+                                };
+
+                                await _saveWebsiteData(updatedData);
+                                _bannerTitleController.clear();
+                                _bannerSubtitleController.clear();
+                                _bannerCtaController.clear();
+                                setState(() {
+                                  _pickedBannerImage = null;
+                                  _bannerImageFile = null;
+                                  _webBannerImage = null;
+                                  _selectedBannerColor = 'purple';
+                                  _isLoading = false;
+                                });
+                                await _refreshData();
+                              },
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add Banner'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: ColorManager.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                              ),
+                            ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+          Text(
+            'Current Banners',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: ColorManager.textDark,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // List of existing banners
+          Expanded(
+            child: banners.isEmpty
+                ? Center(
+                    child: Text(
+                      'No banners yet',
+                      style: TextStyle(
+                        color: ColorManager.textMedium,
+                      ),
+                    ),
+                  )
+                : ReorderableListView.builder(
+                    itemCount: banners.length,
+                    onReorder: (oldIndex, newIndex) {
+                      setState(() {
+                        if (oldIndex < newIndex) {
+                          newIndex -= 1;
+                        }
+                        final item = banners.removeAt(oldIndex);
+                        banners.insert(newIndex, item);
+
+                        final updatedData = {
+                          ...websiteData,
+                          'banners': banners,
+                        };
+
+                        _saveWebsiteData(updatedData);
+                      });
+                    },
+                    itemBuilder: (context, index) {
+                      final banner = banners[index];
+                      final color =
+                          _getColorFromString(banner['color'] ?? 'purple');
+
+                      return Dismissible(
+                        key: Key(
+                            'banner-$index-${banner['timestamp'] ?? index}'),
+                        background: Container(
+                          color: Colors.red,
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 16),
+                          child: const Icon(
+                            Icons.delete,
+                            color: Colors.white,
+                          ),
+                        ),
+                        direction: DismissDirection.endToStart,
+                        onDismissed: (direction) {
+                          List updatedBanners = List.from(banners)
+                            ..removeAt(index);
+                          final updatedData = {
+                            ...websiteData,
+                            'banners': updatedBanners,
+                          };
+
+                          _saveWebsiteData(updatedData).then((_) {
+                            _refreshData();
+                          });
+                        },
+                        child: Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Row(
+                              children: [
+                                // Reorder handle
+                                Icon(Icons.drag_handle, color: Colors.grey),
+                                const SizedBox(width: 8),
+
+                                // Banner color indicator
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+
+                                // Banner image if exists
+                                if (banner['imageUrl'] != null &&
+                                    banner['imageUrl'].toString().isNotEmpty)
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      banner['imageUrl'],
+                                      width: 60,
+                                      height: 60,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        return Container(
+                                          width: 60,
+                                          height: 60,
+                                          color: color.withOpacity(0.2),
+                                          child: Icon(
+                                            Icons.image_not_supported,
+                                            color: color,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  )
+                                else
+                                  Container(
+                                    width: 60,
+                                    height: 60,
+                                    decoration: BoxDecoration(
+                                      color: color.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      Icons.image,
+                                      color: color,
+                                    ),
+                                  ),
+                                const SizedBox(width: 16),
+
+                                // Banner text details
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        banner['title'] ?? 'Banner Title',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        banner['subtitle'] ?? 'Banner Subtitle',
+                                        style: TextStyle(
+                                          color: ColorManager.textMedium,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: color.withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          banner['cta'] ?? 'Call to Action',
+                                          style: TextStyle(
+                                            color: color,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                // Delete button
+                                IconButton(
+                                  icon: const Icon(Icons.delete,
+                                      color: Colors.red),
+                                  onPressed: () {
+                                    List updatedBanners = List.from(banners)
+                                      ..removeAt(index);
+                                    final updatedData = {
+                                      ...websiteData,
+                                      'banners': updatedBanners,
+                                    };
+
+                                    _saveWebsiteData(updatedData).then((_) {
+                                      _refreshData();
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper method to get color from string
+  Color _getColorFromString(String colorName) {
+    switch (colorName.toLowerCase()) {
+      case 'purple':
+        return const Color(0xFF5E4DCD); // Primary brand color
+      case 'blue':
+        return Colors.blue.shade600;
+      case 'green':
+        return Colors.green.shade600;
+      case 'orange':
+        return Colors.orange.shade600;
+      case 'pink':
+        return Colors.pink.shade600;
+      default:
+        return const Color(0xFF5E4DCD); // Default to primary
+    }
   }
 
   Widget _buildAnnouncementsTab(
@@ -751,7 +1341,7 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
                       ),
                       const SizedBox(width: 12),
                       GestureDetector(
-                        onTap: _pickImage,
+                        onTap: _pickTestimonialImage,
                         child: Container(
                           width: 80,
                           height: 80,
@@ -762,13 +1352,22 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
                               color: ColorManager.primary.withOpacity(0.5),
                             ),
                           ),
-                          child: _testimonialPhoto != null
+                          child: _pickedTestimonialPhoto != null
                               ? ClipRRect(
                                   borderRadius: BorderRadius.circular(40),
-                                  child: Image.file(
-                                    _testimonialPhoto!,
-                                    fit: BoxFit.cover,
-                                  ),
+                                  child: kIsWeb
+                                      ? Image.memory(
+                                          _webTestimonialPhoto!,
+                                          fit: BoxFit.cover,
+                                          width: 80,
+                                          height: 80,
+                                        )
+                                      : Image.file(
+                                          _testimonialPhotoFile!,
+                                          fit: BoxFit.cover,
+                                          width: 80,
+                                          height: 80,
+                                        ),
                                 )
                               : Icon(
                                   Icons.add_a_photo,
@@ -845,8 +1444,8 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
                                 });
 
                                 String? photoUrl;
-                                if (_testimonialPhoto != null) {
-                                  photoUrl = await _uploadImage();
+                                if (_pickedTestimonialPhoto != null) {
+                                  photoUrl = await _uploadTestimonialImage();
                                 }
 
                                 final newTestimonial = {
@@ -874,7 +1473,9 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
                                 _testimonialCourseController.clear();
                                 _testimonialContentController.clear();
                                 setState(() {
-                                  _testimonialPhoto = null;
+                                  _pickedTestimonialPhoto = null;
+                                  _webTestimonialPhoto = null;
+                                  _testimonialPhotoFile = null;
                                   _testimonialRating = 5.0;
                                   _isLoading = false;
                                 });

@@ -6,6 +6,8 @@ import 'package:luyip_website_edu/helpers/colors.dart';
 import 'package:luyip_website_edu/helpers/utils.dart';
 
 import 'membership_service.dart';
+// Import the unified transaction service
+import 'package:luyip_website_edu/Courses/transaction_service.dart'; // Update path if needed
 
 class MembershipScreen extends StatefulWidget {
   const MembershipScreen({Key? key}) : super(key: key);
@@ -16,6 +18,8 @@ class MembershipScreen extends StatefulWidget {
 
 class _MembershipScreenState extends State<MembershipScreen> {
   final MembershipService _membershipService = MembershipService();
+  // Add transaction service
+  final TransactionService _transactionService = TransactionService();
   bool _isLoading = true;
   bool _isMember = false;
   DateTime? _expiryDate;
@@ -93,14 +97,18 @@ class _MembershipScreenState extends State<MembershipScreen> {
     }
   }
 
+  // Updated to use the new TransactionService
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
     setState(() {
       _isProcessingPayment = false;
     });
 
     try {
-      bool success = await _membershipService.activateMembership(
-        response.paymentId!,
+      // Use the new transaction service to activate membership
+      bool success = await _transactionService.activateMembership(
+        transactionId: response.paymentId!,
+        amount: 1000.0, // Annual membership fee (₹1000)
+        currency: 'INR',
       );
 
       if (success) {

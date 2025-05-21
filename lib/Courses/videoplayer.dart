@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:video_player/video_player.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:chewie/chewie.dart';
+// Import for web platform registration
+// This is a conditional import that should only be included for web builds
+// import 'web_video_player.dart' if (dart.library.html) 'web_video_player.dart';
 
 class VideoPlayerPage extends StatefulWidget {
   final String videoUrl;
@@ -20,67 +25,24 @@ class VideoPlayerPage extends StatefulWidget {
 }
 
 class _VideoPlayerPageState extends State<VideoPlayerPage> {
-  VideoPlayerController? _controller;
+  VideoPlayerController? _videoController;
+  ChewieController? _chewieController;
+  YoutubePlayerController? _webController;
   bool _isLoading = true;
   String? _errorMessage;
-  final YoutubeExplode _youtubeExplode = YoutubeExplode();
+  bool _useCustomPlayer = true; // Set this to true to force custom player
 
   @override
   void initState() {
     super.initState();
-    _initializePlayer();
-  }
-
-  Future<void> _initializePlayer() async {
-    try {
-      // Extract YouTube video ID from URL
-      final videoId = _extractVideoId(widget.videoUrl);
-
-      if (videoId == null) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Invalid YouTube URL';
-        });
-        return;
+    if (kIsWeb) {
+      if (_useCustomPlayer) {
+        _initializeCustomWebPlayer();
+      } else {
+        _initializeYoutubePlayer();
       }
-
-      // Get the streams manifest
-      final manifest = await _youtubeExplode.videos.streamsClient.getManifest(
-        videoId,
-      );
-
-      // Get the highest quality muxed stream
-      final streamInfo = manifest.muxed.withHighestBitrate();
-      if (streamInfo == null) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'No playable stream found for this video';
-        });
-        return;
-      }
-
-      // Get the stream URL
-      final streamUrl = streamInfo.url.toString();
-
-      // Create a VideoPlayerController with the stream URL
-      _controller = VideoPlayerController.networkUrl(Uri.parse(streamUrl));
-
-      // Initialize the controller and play the video
-      await _controller!.initialize();
-      await _controller!.play();
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Error playing video: ${e.toString()}';
-        });
-      }
+    } else {
+      _initializeNativePlayer();
     }
   }
 
@@ -94,10 +56,97 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     return match?.group(1);
   }
 
+  void _initializeYoutubePlayer() {
+    final String? videoId = _extractVideoId(widget.videoUrl);
+
+    if (videoId == null) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Invalid YouTube URL';
+      });
+      return;
+    }
+
+    _webController = YoutubePlayerController.fromVideoId(
+      videoId: videoId,
+      params: const YoutubePlayerParams(
+        showFullscreenButton: true,
+        showControls: true,
+        enableCaption: false,
+        pointerEvents: PointerEvents.none, // Disable pointer events
+        strictRelatedVideos: true,
+        showVideoAnnotations: false,
+        //privacyEnhanced: true,
+      ),
+    );
+
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  void _initializeCustomWebPlayer() async {
+    final String? videoId = _extractVideoId(widget.videoUrl);
+
+    if (videoId == null) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Invalid YouTube URL';
+      });
+      return;
+    }
+
+    // Create a unique viewType for this instance
+    final String viewType = 'youtube-player-$videoId';
+
+    // In a real implementation, this is where you would register the platform view
+    // This registration should happen during initialization and only once per viewType
+    // Example:
+    // if (kIsWeb) {
+    //   WebVideoPlayerFactory.registerCustomYouTubePlayer(viewType, videoId);
+    // }
+
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _initializeNativePlayer() async {
+    try {
+      // For native platforms, use the direct video URL if possible
+      // This would require having the direct MP4 URL rather than YouTube URL
+      final String? videoId = _extractVideoId(widget.videoUrl);
+
+      if (videoId == null) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Invalid video URL';
+        });
+        return;
+      }
+
+      // In a real implementation, you would need to either:
+      // 1. Have direct MP4 URLs instead of YouTube URLs
+      // 2. Use a server-side proxy to get the direct MP4 URL from YouTube
+      // For now, we'll show an error message
+      setState(() {
+        _isLoading = false;
+        _errorMessage =
+            'Direct video playback not available on mobile. Please provide direct MP4 URLs.';
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Error initializing video: $e';
+      });
+    }
+  }
+
   @override
   void dispose() {
-    _controller?.dispose();
-    _youtubeExplode.close();
+    _videoController?.dispose();
+    _chewieController?.dispose();
+    _webController?.close();
     super.dispose();
   }
 
@@ -170,7 +219,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                               _isLoading = true;
                               _errorMessage = null;
                             });
-                            _initializePlayer();
+                            if (kIsWeb) {
+                              if (_useCustomPlayer) {
+                                _initializeCustomWebPlayer();
+                              } else {
+                                _initializeYoutubePlayer();
+                              }
+                            } else {
+                              _initializeNativePlayer();
+                            }
                           },
                           child: const Text('Retry'),
                         ),
@@ -178,75 +235,51 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                     ),
                   ),
                 )
-              else if (_controller != null && _controller!.value.isInitialized)
+              else if (kIsWeb && _useCustomPlayer)
+                // Custom web player using IFrameElement
                 Expanded(
                   child: Column(
                     children: [
-                      AspectRatio(
-                        aspectRatio: _controller!.value.aspectRatio,
+                      Expanded(
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: VideoPlayer(_controller!),
+                          child: CustomYouTubePlayer(
+                            videoId: _extractVideoId(widget.videoUrl)!,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
-                      VideoProgressIndicator(
-                        _controller!,
-                        allowScrubbing: true,
-                        colors: VideoProgressColors(
-                          playedColor: ColorManager.primary,
-                          bufferedColor: ColorManager.primary.withOpacity(0.3),
-                          backgroundColor: Colors.grey.shade300,
+                    ],
+                  ),
+                )
+              else if (kIsWeb && _webController != null)
+                // Standard YouTube player using YoutubePlayerIFrame
+                Expanded(
+                  child: Column(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: YoutubePlayer(
+                          controller: _webController!,
+                          aspectRatio: 16 / 9,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              _controller!.value.isPlaying
-                                  ? Icons.pause
-                                  : Icons.play_arrow,
-                              color: ColorManager.primary,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                if (_controller!.value.isPlaying) {
-                                  _controller!.pause();
-                                } else {
-                                  _controller!.play();
-                                }
-                              });
-                            },
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                )
+              else if (_chewieController != null)
+                // Chewie player for native
+                Expanded(
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Chewie(
+                            controller: _chewieController!,
                           ),
-                          IconButton(
-                            icon: Icon(
-                              Icons.replay_10,
-                              color: ColorManager.primary,
-                            ),
-                            onPressed: () {
-                              final currentPosition =
-                                  _controller!.value.position;
-                              final newPosition =
-                                  currentPosition - const Duration(seconds: 10);
-                              _controller!.seekTo(newPosition);
-                            },
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              Icons.forward_10,
-                              color: ColorManager.primary,
-                            ),
-                            onPressed: () {
-                              final currentPosition =
-                                  _controller!.value.position;
-                              final newPosition =
-                                  currentPosition + const Duration(seconds: 10);
-                              _controller!.seekTo(newPosition);
-                            },
-                          ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
@@ -261,6 +294,65 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// Custom YouTube player widget that uses HtmlElementView
+class CustomYouTubePlayer extends StatelessWidget {
+  final String videoId;
+
+  const CustomYouTubePlayer({
+    Key? key,
+    required this.videoId,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    if (kIsWeb) {
+      // Using dart:html for web platform through conditional import
+      return HtmlElementViewCustomPlayer(videoId: videoId);
+    } else {
+      // Fallback for non-web platforms
+      return const Center(
+        child: Text('Custom player only available on web platform'),
+      );
+    }
+  }
+}
+
+// Platform-specific implementation using HtmlElementView
+class HtmlElementViewCustomPlayer extends StatelessWidget {
+  final String videoId;
+
+  const HtmlElementViewCustomPlayer({
+    Key? key,
+    required this.videoId,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    // Create a unique viewType for this instance
+    final String viewType = 'youtube-player-$videoId';
+
+    // In a real implementation, we need to register this view type
+    // This would be done in the main.dart or during app initialization:
+    // WebVideoPlayerFactory.registerCustomYouTubePlayer(viewType, videoId);
+
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: kIsWeb
+          ? HtmlElementView(viewType: viewType)
+          : Container(
+              color: Colors.black,
+              child: const Center(
+                child: Text(
+                  'Custom player only available on web platform',
+                  style: TextStyle(color: Colors.white),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
     );
   }
 }
