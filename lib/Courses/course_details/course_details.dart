@@ -94,6 +94,12 @@ class _CourseDetailsState extends State<CourseDetails> {
   }
 
   void _handleEnrollment(double price) {
+    print('Handling enrollment for ${widget.coursename}');
+    print('Original price: $price');
+    print('Is member: $_isMember');
+    print('Discount percentage: $_discountPercentage');
+    print('Discounted price: $_discountedPrice');
+
     _paymentService.handleEnrollment(
       widget.coursename,
       price,
@@ -141,7 +147,7 @@ class _CourseDetailsState extends State<CourseDetails> {
           List<dynamic> featureCards = data['FeatureCards'] ?? [];
           String scheduleDocumentUrl = data['SchedulePDF'] ?? '';
 
-          // Parse course price
+          // Parse course price - ensure this matches the pricing logic in service
           String priceStr = data['Course Price'] ?? 'FREE';
           double price = 0.0;
           if (priceStr.toLowerCase() != 'free') {
@@ -150,6 +156,8 @@ class _CourseDetailsState extends State<CourseDetails> {
                 double.tryParse(priceStr.replaceAll(RegExp(r'[^\d.]'), '')) ??
                     0.0;
           }
+
+          print('Course price parsed: $price from "$priceStr"');
 
           return NestedScrollView(
             controller: _scrollController,
@@ -273,12 +281,13 @@ class _CourseDetailsState extends State<CourseDetails> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CourseDetailSections.buildCourseInfo(
-                data,
-                learningObjectives,
-                _isMember,
-                _discountPercentage,
-                context,
-              ),
+                  data,
+                  learningObjectives,
+                  _isMember,
+                  _discountPercentage,
+                  context,
+                  widget.userRole,
+                  widget.coursename),
               const SizedBox(height: 24),
               CourseDetailSections.buildFeatureCards(featureCards),
               const SizedBox(height: 40),

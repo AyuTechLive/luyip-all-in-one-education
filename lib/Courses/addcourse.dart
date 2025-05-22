@@ -107,6 +107,7 @@ class _AddCourseState extends State<AddCourse> {
 
   // Use the ImageUploadHandler instead of direct File handling
   late ImageUploadHandler imageHandler;
+
   Future<void> _handleFileUpload({
     required FileUploadHandler handler,
     required TextEditingController controller,
@@ -139,876 +140,1039 @@ class _AddCourseState extends State<AddCourse> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isLargeScreen = screenWidth > 1200;
+
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text(
-          'Add New Course',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: const Text(
+          'Create New Course',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 24,
+          ),
         ),
-        backgroundColor: ColorManager.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1E293B),
         elevation: 0,
+        centerTitle: false,
+        toolbarHeight: 80,
       ),
-      body: Container(
-        padding: EdgeInsets.all(24),
-        child: SingleChildScrollView(
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(isLargeScreen ? 32 : 16),
+        child: Center(
+          child: Container(
+            constraints: BoxConstraints(
+                maxWidth: isLargeScreen ? 1400 : double.infinity),
+            child: isLargeScreen ? _buildDesktopLayout() : _buildMobileLayout(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopLayout() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Left Column - Main Form (70%)
+        Expanded(
+          flex: 7,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Course Information',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: ColorManager.textDark,
+              _buildBasicInfoSection(),
+              const SizedBox(height: 24),
+              _buildPricingSection(),
+              const SizedBox(height: 24),
+              _buildAdditionalInfoSection(),
+              const SizedBox(height: 24),
+              _buildLearningObjectivesSection(),
+              const SizedBox(height: 24),
+              _buildFeatureCardsSection(),
+              const SizedBox(height: 24),
+              _buildMaterialsSection(),
+              const SizedBox(height: 24),
+              _buildKeyDocumentsSection(),
+            ],
+          ),
+        ),
+        const SizedBox(width: 32),
+        // Right Column - Image & Teachers (30%)
+        Expanded(
+          flex: 3,
+          child: Column(
+            children: [
+              _buildImageUploadSection(),
+              const SizedBox(height: 24),
+              _buildTeachersSection(),
+              const SizedBox(height: 24),
+              _buildSubmitButton(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileLayout() {
+    return Column(
+      children: [
+        _buildBasicInfoSection(),
+        const SizedBox(height: 24),
+        _buildImageUploadSection(),
+        const SizedBox(height: 24),
+        _buildPricingSection(),
+        const SizedBox(height: 24),
+        _buildAdditionalInfoSection(),
+        const SizedBox(height: 24),
+        _buildTeachersSection(),
+        const SizedBox(height: 24),
+        _buildLearningObjectivesSection(),
+        const SizedBox(height: 24),
+        _buildFeatureCardsSection(),
+        const SizedBox(height: 24),
+        _buildMaterialsSection(),
+        const SizedBox(height: 24),
+        _buildKeyDocumentsSection(),
+        const SizedBox(height: 32),
+        _buildSubmitButton(),
+        const SizedBox(height: 40),
+      ],
+    );
+  }
+
+  Widget _buildCard(
+      String title, String subtitle, IconData icon, Widget child) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: ColorManager.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: ColorManager.primary,
+                  size: 24,
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          child,
+        ],
+      ),
+    );
+  }
 
-              Row(
+  Widget _buildBasicInfoSection() {
+    return _buildCard(
+      'Basic Information',
+      'Enter the fundamental details about your course',
+      Icons.info_outline,
+      Column(
+        children: [
+          _buildTextField(
+            controller: coursenamecontroller,
+            labelText: 'Course Name',
+            hintText: 'Enter course name',
+            prefixIcon: Icons.title,
+            maxLines: 1,
+          ),
+          const SizedBox(height: 20),
+          _buildDropdownField(
+            labelText: 'Category',
+            value: selectedCategory,
+            items: categories.map((category) {
+              return DropdownMenuItem(
+                value: category,
+                child: Text(category),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                selectedCategory = value!;
+              });
+            },
+            prefixIcon: Icons.category,
+          ),
+          const SizedBox(height: 20),
+          _buildTextField(
+            controller: difficultyController,
+            labelText: 'Difficulty Level',
+            hintText: 'e.g., Beginner, Intermediate, Advanced',
+            prefixIcon: Icons.trending_up,
+            maxLines: 1,
+          ),
+          const SizedBox(height: 20),
+          _buildTextField(
+            controller: coursediscriptioncontroller,
+            labelText: 'Course Description',
+            hintText: 'Provide a detailed description',
+            prefixIcon: Icons.description,
+            maxLines: 5,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPricingSection() {
+    return _buildCard(
+      'Pricing Information',
+      'Set your course pricing and discounts',
+      Icons.monetization_on,
+      Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  controller: coursepricecontroller,
+                  labelText: 'Price (₹)',
+                  hintText: 'Enter course price',
+                  prefixIcon: Icons.currency_rupee,
+                  keyboardType: TextInputType.number,
+                  maxLines: 1,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildTextField(
+                  controller: discountPercentageController,
+                  labelText: 'Membership Discount (%)',
+                  hintText: 'Enter discount percentage',
+                  prefixIcon: Icons.discount,
+                  keyboardType: TextInputType.number,
+                  maxLines: 1,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: CheckboxListTile(
+              title: const Text(
+                'Featured Course',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text('Highlight this course on the homepage'),
+              value: isFeaturesCourse,
+              onChanged: (value) {
+                setState(() {
+                  isFeaturesCourse = value!;
+                });
+              },
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+              activeColor: ColorManager.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdditionalInfoSection() {
+    return _buildCard(
+      'Additional Information',
+      'Course duration and prerequisites',
+      Icons.info,
+      Column(
+        children: [
+          _buildTextField(
+            controller: durationController,
+            labelText: 'Course Duration',
+            hintText: 'e.g., 8 weeks, 12 hours',
+            prefixIcon: Icons.timer,
+            maxLines: 1,
+          ),
+          const SizedBox(height: 20),
+          _buildTextField(
+            controller: prerequisitesController,
+            labelText: 'Prerequisites',
+            hintText: 'Any requirements or prerequisites',
+            prefixIcon: Icons.list_alt,
+            maxLines: 3,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageUploadSection() {
+    return _buildCard(
+      'Course Banner',
+      'Upload an attractive banner image',
+      Icons.image,
+      Column(
+        children: [
+          Container(
+            width: double.infinity,
+            height: 200,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFE2E8F0),
+                width: 2,
+              ),
+            ),
+            child: imageHandler.getImagePreview(
+              height: 200,
+              width: double.infinity,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.upload),
+              label: const Text('Select Banner Image'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ColorManager.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () async {
+                final success = await imageHandler.pickImage();
+                if (success) {
+                  setState(() {
+                    loading = true;
+                  });
+                  try {
+                    final imageUrl = await imageHandler
+                        .uploadImageToFirebase('/course_banners');
+                    courseimglinkcontroller.text = imageUrl;
+                    Utils().toastMessage('Image uploaded successfully!');
+                  } catch (e) {
+                    Utils().toastMessage('Failed to upload image: $e');
+                  } finally {
+                    setState(() {
+                      loading = false;
+                    });
+                  }
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTeachersSection() {
+    return _buildCard(
+      'Course Instructors',
+      'Select teachers for this course',
+      Icons.people,
+      AddCourseTeachers(
+        selectedTeachers: selectedTeachers,
+        onTeachersChanged: (teachers) {
+          setState(() {
+            selectedTeachers = teachers;
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildLearningObjectivesSection() {
+    return _buildCard(
+      'Learning Objectives',
+      'What will students achieve in this course?',
+      Icons.track_changes,
+      Column(
+        children: [
+          if (learningObjectives.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Left column
-                  Expanded(
-                    flex: 3,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionTitle('Basic Details'),
-                        SizedBox(height: 16),
-
-                        // Course name field
-                        _buildTextField(
-                          controller: coursenamecontroller,
-                          labelText: 'Course Name',
-                          hintText: 'Enter course name',
-                          prefixIcon: Icons.title,
-                          maxLines: 1,
-                        ),
-                        SizedBox(height: 16),
-
-                        // Course category dropdown
-                        _buildDropdownField(
-                          labelText: 'Category',
-                          value: selectedCategory,
-                          items: categories.map((category) {
-                            return DropdownMenuItem(
-                              value: category,
-                              child: Text(category),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              selectedCategory = value!;
-                            });
-                          },
-                          prefixIcon: Icons.category,
-                        ),
-                        SizedBox(height: 16),
-
-                        // Difficulty level field
-                        _buildTextField(
-                          controller: difficultyController,
-                          labelText: 'Difficulty Level',
-                          hintText: 'e.g., Beginner, Intermediate, Advanced',
-                          prefixIcon: Icons.trending_up,
-                          maxLines: 1,
-                        ),
-                        SizedBox(height: 16),
-
-                        // Course description field
-                        _buildTextField(
-                          controller: coursediscriptioncontroller,
-                          labelText: 'Course Description',
-                          hintText: 'Provide a detailed description',
-                          prefixIcon: Icons.description,
-                          maxLines: 5,
-                        ),
-                        SizedBox(height: 24),
-
-                        _buildSectionTitle('Pricing Information'),
-                        SizedBox(height: 16),
-
-                        // Course price field
-                        _buildTextField(
-                          controller: coursepricecontroller,
-                          labelText: 'Price (₹)',
-                          hintText: 'Enter course price',
-                          prefixIcon: Icons.currency_rupee,
-                          keyboardType: TextInputType.number,
-                          maxLines: 1,
-                        ),
-                        SizedBox(height: 16),
-
-                        // Discount percentage field
-                        _buildTextField(
-                          controller: discountPercentageController,
-                          labelText: 'Membership Discount (%)',
-                          hintText: 'Enter discount percentage for members',
-                          prefixIcon: Icons.discount,
-                          keyboardType: TextInputType.number,
-                          maxLines: 1,
-                        ),
-                        SizedBox(height: 24),
-
-                        _buildSectionTitle('Additional Information'),
-                        SizedBox(height: 16),
-
-                        // Duration field
-                        _buildTextField(
-                          controller: durationController,
-                          labelText: 'Course Duration',
-                          hintText: 'e.g., 8 weeks, 12 hours',
-                          prefixIcon: Icons.timer,
-                          maxLines: 1,
-                        ),
-                        SizedBox(height: 16),
-
-                        // Prerequisites field
-                        _buildTextField(
-                          controller: prerequisitesController,
-                          labelText: 'Prerequisites',
-                          hintText: 'Any requirements or prerequisites',
-                          prefixIcon: Icons.list_alt,
-                          maxLines: 3,
-                        ),
-                        SizedBox(height: 16),
-
-                        // Featured course checkbox
-                        CheckboxListTile(
-                          title: Text('Featured Course'),
-                          value: isFeaturesCourse,
-                          onChanged: (value) {
-                            setState(() {
-                              isFeaturesCourse = value!;
-                            });
-                          },
-                          controlAffinity: ListTileControlAffinity.leading,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ],
+                  const Text(
+                    'Learning Objectives',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
                   ),
-
-                  SizedBox(width: 32),
-
-                  // Right column
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionTitle('Course Banner Image'),
-                        SizedBox(height: 16),
-
-                        // Image upload section using the new handler
-                        imageHandler.getImagePreview(
-                          height: 200,
-                          width: double.infinity,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        SizedBox(height: 16),
-
-                        ElevatedButton.icon(
-                          icon: Icon(Icons.upload),
-                          label: Text('Select Banner Image'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: ColorManager.primary,
-                            foregroundColor: Colors.white,
-                            minimumSize: Size(double.infinity, 48),
-                          ),
-                          onPressed: () async {
-                            final success = await imageHandler.pickImage();
-                            if (success) {
+                  const SizedBox(height: 8),
+                  ...learningObjectives.asMap().entries.map((entry) {
+                    int idx = entry.key;
+                    String objective = entry.value;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Icon(Icons.circle,
+                              size: 8, color: ColorManager.primary),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(objective)),
+                          IconButton(
+                            icon:
+                                Icon(Icons.delete, color: Colors.red.shade300),
+                            onPressed: () {
                               setState(() {
-                                loading = true;
+                                learningObjectives.removeAt(idx);
                               });
-                              try {
-                                final imageUrl = await imageHandler
-                                    .uploadImageToFirebase('/course_banners');
-                                courseimglinkcontroller.text = imageUrl;
-                              } catch (e) {
-                                Utils().toastMessage(
-                                  'Failed to upload image: $e',
-                                );
-                              } finally {
-                                setState(() {
-                                  loading = false;
-                                });
-                              }
-                            }
-                          },
-                        ),
-                        SizedBox(height: 24),
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _objectiveController,
+                  decoration: const InputDecoration(
+                    labelText: 'Objective',
+                    hintText: 'e.g., Master fundamental concepts',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () {
+                  if (_objectiveController.text.trim().isNotEmpty) {
+                    setState(() {
+                      learningObjectives.add(_objectiveController.text.trim());
+                      _objectiveController.clear();
+                    });
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ColorManager.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.all(12),
+                ),
+                child: const Icon(Icons.add),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-                        // Replace single teacher selection with multiple teachers component
-                        AddCourseTeachers(
-                          selectedTeachers: selectedTeachers,
-                          onTeachersChanged: (teachers) {
-                            setState(() {
-                              selectedTeachers = teachers;
-                            });
-                          },
-                        ),
-                      ],
+  Widget _buildFeatureCardsSection() {
+    return _buildCard(
+      'Feature Cards',
+      'Highlight key aspects of your course',
+      Icons.featured_play_list,
+      Column(
+        children: [
+          if (featureCards.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Feature Cards',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 2,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
+                    itemCount: featureCards.length,
+                    itemBuilder: (context, index) {
+                      final feature = featureCards[index];
+                      final color =
+                          _getColorFromString(feature['color'] ?? 'blue');
+                      final icon =
+                          _getIconFromString(feature['icon'] ?? 'info');
+
+                      return Stack(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: color.withOpacity(0.3)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(icon, color: color, size: 20),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        feature['title'] ?? '',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Flexible(
+                                  child: Text(
+                                    feature['description'] ?? '',
+                                    style: const TextStyle(fontSize: 12),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  featureCards.removeAt(index);
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade300,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.close,
+                                    color: Colors.white, size: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          ExpansionTile(
+            title: const Text('Add New Feature Card'),
+            tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _featureTitleController,
+                      decoration: const InputDecoration(
+                        labelText: 'Title',
+                        hintText: 'e.g., Video Lectures',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _featureDescController,
+                      decoration: const InputDecoration(
+                        labelText: 'Description',
+                        hintText:
+                            'e.g., HD video content with interactive elements',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            decoration: const InputDecoration(
+                              labelText: 'Icon',
+                              border: OutlineInputBorder(),
+                            ),
+                            value: _selectedIcon,
+                            items: iconOptions.keys.map((key) {
+                              return DropdownMenuItem<String>(
+                                value: key,
+                                child: Row(
+                                  children: [
+                                    Icon(iconOptions[key]),
+                                    const SizedBox(width: 8),
+                                    Text(key),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedIcon = value!;
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            decoration: const InputDecoration(
+                              labelText: 'Color',
+                              border: OutlineInputBorder(),
+                            ),
+                            value: _selectedColor,
+                            items: colorOptions.keys.map((key) {
+                              return DropdownMenuItem<String>(
+                                value: key,
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 16,
+                                      height: 16,
+                                      decoration: BoxDecoration(
+                                        color: colorOptions[key],
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(key),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedColor = value!;
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          if (_featureTitleController.text.trim().isNotEmpty &&
+                              _featureDescController.text.trim().isNotEmpty) {
+                            setState(() {
+                              featureCards.add({
+                                'title': _featureTitleController.text.trim(),
+                                'description':
+                                    _featureDescController.text.trim(),
+                                'icon': _selectedIcon,
+                                'color': _selectedColor,
+                              });
+                              _featureTitleController.clear();
+                              _featureDescController.clear();
+                            });
+                          } else {
+                            Utils().toastMessage('Please fill in all fields');
+                          }
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add Feature Card'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: ColorManager.primary,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-              SizedBox(height: 32),
+  Widget _buildMaterialsSection() {
+    return _buildCard(
+      'Course Materials',
+      'Upload course files and resources',
+      Icons.folder_open,
+      Column(
+        children: [
+          _buildTextField(
+            controller: previewVideoController,
+            labelText: 'Preview Video Link',
+            hintText: 'Enter YouTube/Vimeo URL',
+            prefixIcon: Icons.video_library,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  controller: previewPdfController,
+                  labelText: 'Preview PDF',
+                  hintText: 'Upload course preview PDF',
+                  prefixIcon: Icons.picture_as_pdf,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.upload),
+                onPressed: () async => _handleFileUpload(
+                  handler: previewPdfHandler,
+                  controller: previewPdfController,
+                  storagePath: 'course_previews',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  controller: syllabusPdfController,
+                  labelText: 'Syllabus PDF',
+                  hintText: 'Upload course syllabus',
+                  prefixIcon: Icons.assignment,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.upload),
+                onPressed: () async => _handleFileUpload(
+                  handler: syllabusPdfHandler,
+                  controller: syllabusPdfController,
+                  storagePath: 'course_syllabi',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  controller: schedulePdfController,
+                  labelText: 'Schedule PDF',
+                  hintText: 'Upload course schedule/timetable',
+                  prefixIcon: Icons.calendar_month,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.upload),
+                onPressed: () async => _handleFileUpload(
+                  handler: schedulePdfHandler,
+                  controller: schedulePdfController,
+                  storagePath: 'course_schedules',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-              // Learning Objectives Section
-              _buildSectionTitle('Learning Objectives'),
-              SizedBox(height: 16),
-              _buildObjectivesSection(),
-              SizedBox(height: 24),
+  Widget _buildKeyDocumentsSection() {
+    return _buildCard(
+      'Key Documents',
+      'Add worksheets, references, and other materials',
+      Icons.library_books,
+      Column(
+        children: [
+          if (keyDocuments.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Key Documents',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: keyDocuments.length,
+                    separatorBuilder: (context, index) => const Divider(),
+                    itemBuilder: (context, index) {
+                      final doc = keyDocuments[index];
+                      final icon =
+                          _getDocIconFromType(doc['type'] ?? 'document');
 
-              // Feature Cards Section
-              _buildSectionTitle('Feature Cards'),
-              SizedBox(height: 16),
-              _buildFeatureCardsSection(),
-              SizedBox(height: 24),
+                      return ListTile(
+                        leading: Icon(icon, color: ColorManager.primary),
+                        title: Text(doc['title'] ?? ''),
+                        subtitle: Text(doc['description'] ?? ''),
+                        trailing: IconButton(
+                          icon: Icon(Icons.delete, color: Colors.red.shade300),
+                          onPressed: () {
+                            setState(() {
+                              keyDocuments.removeAt(index);
+                            });
+                          },
+                        ),
+                        dense: true,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          ExpansionTile(
+            title: const Text('Add New Document'),
+            tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _documentTitleController,
+                      decoration: const InputDecoration(
+                        labelText: 'Document Title',
+                        hintText: 'e.g., Week 1 Worksheet',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _documentDescController,
+                      decoration: const InputDecoration(
+                        labelText: 'Description',
+                        hintText:
+                            'e.g., Exercises to practice the first week\'s concepts',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        labelText: 'Document Type',
+                        border: OutlineInputBorder(),
+                      ),
+                      value: _selectedDocType,
+                      items: docTypeOptions.keys.map((key) {
+                        return DropdownMenuItem<String>(
+                          value: key,
+                          child: Row(
+                            children: [
+                              Icon(docTypeOptions[key]),
+                              const SizedBox(width: 8),
+                              Text(key),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedDocType = value!;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _documentUrlController,
+                            decoration: const InputDecoration(
+                              labelText: 'Document URL',
+                              hintText: 'Upload document or enter URL',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.upload),
+                          onPressed: () async => _handleFileUpload(
+                            handler: documentUploadHandler,
+                            controller: _documentUrlController,
+                            storagePath: 'course_documents/$_selectedDocType',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          if (_documentTitleController.text.trim().isNotEmpty &&
+                              _documentDescController.text.trim().isNotEmpty &&
+                              _documentUrlController.text.trim().isNotEmpty) {
+                            setState(() {
+                              keyDocuments.add({
+                                'title': _documentTitleController.text.trim(),
+                                'description':
+                                    _documentDescController.text.trim(),
+                                'type': _selectedDocType,
+                                'url': _documentUrlController.text.trim(),
+                              });
+                              _documentTitleController.clear();
+                              _documentDescController.clear();
+                              _documentUrlController.clear();
+                            });
+                          } else {
+                            Utils().toastMessage('Please fill in all fields');
+                          }
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add Document'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: ColorManager.primary,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-              // Materials Section
-              _buildSectionTitle('Course Materials'),
-              SizedBox(height: 16),
-              _buildMaterialsSection(),
-              SizedBox(height: 24),
-
-              // Key Documents Section
-              _buildSectionTitle('Key Documents'),
-              SizedBox(height: 16),
-              _buildKeyDocumentsSection(),
-              SizedBox(height: 32),
-
-              // Submit button
-              Center(
-                child: SizedBox(
-                  width: 300,
-                  height: 50,
+  Widget _buildSubmitButton() {
+    return Container(
+      width: double.infinity,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                const Text(
+                  'Ready to Create?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Review your course details and create',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
                   child: Roundbuttonnew(
                     loading: loading,
                     title: 'Create Course',
                     ontap: _createCourse,
                   ),
                 ),
-              ),
-              SizedBox(height: 50),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildObjectivesSection() {
-    return Column(
-      children: [
-        Text(
-            'Add learning objectives that students will achieve in this course'),
-        SizedBox(height: 8),
-
-        // List of existing objectives
-        if (learningObjectives.isNotEmpty) ...[
-          Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: ColorManager.cardColor,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Learning Objectives',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: ColorManager.textDark,
-                  ),
-                ),
-                SizedBox(height: 8),
-                ...learningObjectives.asMap().entries.map((entry) {
-                  int idx = entry.key;
-                  String objective = entry.value;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Icon(Icons.circle,
-                            size: 8, color: ColorManager.primary),
-                        SizedBox(width: 8),
-                        Expanded(child: Text(objective)),
-                        IconButton(
-                          icon: Icon(Icons.delete, color: Colors.red.shade300),
-                          onPressed: () {
-                            setState(() {
-                              learningObjectives.removeAt(idx);
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ],
-            ),
-          ),
-          SizedBox(height: 16),
-        ],
-
-        // Add new objective
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _objectiveController,
-                decoration: InputDecoration(
-                  labelText: 'Objective',
-                  hintText: 'e.g., Master fundamental concepts',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-            SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: () {
-                if (_objectiveController.text.trim().isNotEmpty) {
-                  setState(() {
-                    learningObjectives.add(_objectiveController.text.trim());
-                    _objectiveController.clear();
-                  });
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ColorManager.primary,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.all(12),
-              ),
-              child: Icon(Icons.add),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFeatureCardsSection() {
-    return Column(
-      children: [
-        Text('Add feature cards to highlight key aspects of your course'),
-        SizedBox(height: 8),
-
-        // List of existing feature cards
-        if (featureCards.isNotEmpty) ...[
-          Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: ColorManager.cardColor,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Feature Cards',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: ColorManager.textDark,
-                  ),
-                ),
-                SizedBox(height: 8),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 2,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: featureCards.length,
-                  itemBuilder: (context, index) {
-                    final feature = featureCards[index];
-                    final color =
-                        _getColorFromString(feature['color'] ?? 'blue');
-                    final icon = _getIconFromString(feature['icon'] ?? 'info');
-
-                    return Stack(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: color.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: color.withOpacity(0.3)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(icon, color: color, size: 20),
-                                  SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      feature['title'] ?? '',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 4),
-                              Flexible(
-                                child: Text(
-                                  feature['description'] ?? '',
-                                  style: TextStyle(fontSize: 12),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Positioned(
-                          top: 0,
-                          right: 0,
-                          child: InkWell(
-                            onTap: () {
-                              setState(() {
-                                featureCards.removeAt(index);
-                              });
-                            },
-                            child: Container(
-                              padding: EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: Colors.red.shade300,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(Icons.close,
-                                  color: Colors.white, size: 12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 16),
-        ],
-
-        // Add new feature card
-        ExpansionTile(
-          title: Text('Add New Feature Card'),
-          tilePadding: EdgeInsets.symmetric(horizontal: 8),
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: _featureTitleController,
-                    decoration: InputDecoration(
-                      labelText: 'Title',
-                      hintText: 'e.g., Video Lectures',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  TextField(
-                    controller: _featureDescController,
-                    decoration: InputDecoration(
-                      labelText: 'Description',
-                      hintText:
-                          'e.g., HD video content with interactive elements',
-                      border: OutlineInputBorder(),
-                    ),
-                    maxLines: 2,
-                  ),
-                  SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          decoration: InputDecoration(
-                            labelText: 'Icon',
-                            border: OutlineInputBorder(),
-                          ),
-                          value: _selectedIcon,
-                          items: iconOptions.keys.map((key) {
-                            return DropdownMenuItem<String>(
-                              value: key,
-                              child: Row(
-                                children: [
-                                  Icon(iconOptions[key]),
-                                  SizedBox(width: 8),
-                                  Text(key),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedIcon = value!;
-                            });
-                          },
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          decoration: InputDecoration(
-                            labelText: 'Color',
-                            border: OutlineInputBorder(),
-                          ),
-                          value: _selectedColor,
-                          items: colorOptions.keys.map((key) {
-                            return DropdownMenuItem<String>(
-                              value: key,
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 16,
-                                    height: 16,
-                                    decoration: BoxDecoration(
-                                      color: colorOptions[key],
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(key),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedColor = value!;
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      if (_featureTitleController.text.trim().isNotEmpty &&
-                          _featureDescController.text.trim().isNotEmpty) {
-                        setState(() {
-                          featureCards.add({
-                            'title': _featureTitleController.text.trim(),
-                            'description': _featureDescController.text.trim(),
-                            'icon': _selectedIcon,
-                            'color': _selectedColor,
-                          });
-                          _featureTitleController.clear();
-                          _featureDescController.clear();
-                        });
-                      } else {
-                        Utils().toastMessage('Please fill in all fields');
-                      }
-                    },
-                    icon: Icon(Icons.add),
-                    label: Text('Add Feature Card'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ColorManager.primary,
-                      foregroundColor: Colors.white,
-                      minimumSize: Size(double.infinity, 48),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMaterialsSection() {
-    return Column(
-      children: [
-        // Preview Video Link
-        _buildTextField(
-          controller: previewVideoController,
-          labelText: 'Preview Video Link',
-          hintText: 'Enter YouTube/Vimeo URL',
-          prefixIcon: Icons.video_library,
-        ),
-        SizedBox(height: 16),
-
-        // Preview PDF Upload
-        Row(
-          children: [
-            Expanded(
-              child: _buildTextField(
-                controller: previewPdfController,
-                labelText: 'Preview PDF',
-                hintText: 'Upload course preview PDF',
-                prefixIcon: Icons.picture_as_pdf,
-              ),
-            ),
-            IconButton(
-              icon: Icon(Icons.upload),
-              onPressed: () async => _handleFileUpload(
-                handler: previewPdfHandler,
-                controller: previewPdfController,
-                storagePath: 'course_previews',
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 16),
-
-        // Syllabus PDF Upload
-        Row(
-          children: [
-            Expanded(
-              child: _buildTextField(
-                controller: syllabusPdfController,
-                labelText: 'Syllabus PDF',
-                hintText: 'Upload course syllabus',
-                prefixIcon: Icons.assignment,
-              ),
-            ),
-            IconButton(
-              icon: Icon(Icons.upload),
-              onPressed: () async => _handleFileUpload(
-                handler: syllabusPdfHandler,
-                controller: syllabusPdfController,
-                storagePath: 'course_syllabi',
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 16),
-
-        // Schedule PDF Upload
-        Row(
-          children: [
-            Expanded(
-              child: _buildTextField(
-                controller: schedulePdfController,
-                labelText: 'Schedule PDF',
-                hintText: 'Upload course schedule/timetable',
-                prefixIcon: Icons.calendar_month,
-              ),
-            ),
-            IconButton(
-              icon: Icon(Icons.upload),
-              onPressed: () async => _handleFileUpload(
-                handler: schedulePdfHandler,
-                controller: schedulePdfController,
-                storagePath: 'course_schedules',
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildKeyDocumentsSection() {
-    return Column(
-      children: [
-        Text(
-            'Add key documents for your course (worksheets, references, etc.)'),
-        SizedBox(height: 8),
-
-        // List of existing documents
-        if (keyDocuments.isNotEmpty) ...[
-          Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: ColorManager.cardColor,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Key Documents',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: ColorManager.textDark,
-                  ),
-                ),
-                SizedBox(height: 8),
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: NeverScrollableScrollPhysics(),
-                  itemCount: keyDocuments.length,
-                  separatorBuilder: (context, index) => Divider(),
-                  itemBuilder: (context, index) {
-                    final doc = keyDocuments[index];
-                    final icon = _getDocIconFromType(doc['type'] ?? 'document');
-
-                    return ListTile(
-                      leading: Icon(icon, color: ColorManager.primary),
-                      title: Text(doc['title'] ?? ''),
-                      subtitle: Text(doc['description'] ?? ''),
-                      trailing: IconButton(
-                        icon: Icon(Icons.delete, color: Colors.red.shade300),
-                        onPressed: () {
-                          setState(() {
-                            keyDocuments.removeAt(index);
-                          });
-                        },
-                      ),
-                      dense: true,
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 16),
-        ],
-
-        // Add new document
-        ExpansionTile(
-          title: Text('Add New Document'),
-          tilePadding: EdgeInsets.symmetric(horizontal: 8),
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: _documentTitleController,
-                    decoration: InputDecoration(
-                      labelText: 'Document Title',
-                      hintText: 'e.g., Week 1 Worksheet',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  TextField(
-                    controller: _documentDescController,
-                    decoration: InputDecoration(
-                      labelText: 'Description',
-                      hintText:
-                          'e.g., Exercises to practice the first week\'s concepts',
-                      border: OutlineInputBorder(),
-                    ),
-                    maxLines: 2,
-                  ),
-                  SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    decoration: InputDecoration(
-                      labelText: 'Document Type',
-                      border: OutlineInputBorder(),
-                    ),
-                    value: _selectedDocType,
-                    items: docTypeOptions.keys.map((key) {
-                      return DropdownMenuItem<String>(
-                        value: key,
-                        child: Row(
-                          children: [
-                            Icon(docTypeOptions[key]),
-                            SizedBox(width: 8),
-                            Text(key),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedDocType = value!;
-                      });
-                    },
-                  ),
-                  SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _documentUrlController,
-                          decoration: InputDecoration(
-                            labelText: 'Document URL',
-                            hintText: 'Upload document or enter URL',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.upload),
-                        onPressed: () async => _handleFileUpload(
-                          handler: documentUploadHandler,
-                          controller: _documentUrlController,
-                          storagePath: 'course_documents/${_selectedDocType}',
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      if (_documentTitleController.text.trim().isNotEmpty &&
-                          _documentDescController.text.trim().isNotEmpty &&
-                          _documentUrlController.text.trim().isNotEmpty) {
-                        setState(() {
-                          keyDocuments.add({
-                            'title': _documentTitleController.text.trim(),
-                            'description': _documentDescController.text.trim(),
-                            'type': _selectedDocType,
-                            'url': _documentUrlController.text.trim(),
-                          });
-                          _documentTitleController.clear();
-                          _documentDescController.clear();
-                          _documentUrlController.clear();
-                        });
-                      } else {
-                        Utils().toastMessage('Please fill in all fields');
-                      }
-                    },
-                    icon: Icon(Icons.add),
-                    label: Text('Add Document'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ColorManager.primary,
-                      foregroundColor: Colors.white,
-                      minimumSize: Size(double.infinity, 48),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: ColorManager.primary,
-          ),
-        ),
-        Divider(color: ColorManager.primary.withOpacity(0.5)),
-      ],
     );
   }
 
@@ -1021,19 +1185,48 @@ class _AddCourseState extends State<AddCourse> {
     TextInputType keyboardType = TextInputType.text,
     bool readOnly = false,
   }) {
-    return TextFormField(
-      controller: controller,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      readOnly: readOnly,
-      decoration: InputDecoration(
-        labelText: labelText,
-        hintText: hintText,
-        prefixIcon: Icon(prefixIcon),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        filled: true,
-        fillColor: Colors.white,
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          labelText,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF374151),
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          readOnly: readOnly,
+          decoration: InputDecoration(
+            hintText: hintText,
+            prefixIcon:
+                Icon(prefixIcon, color: const Color(0xFF6B7280), size: 20),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: ColorManager.primary, width: 2),
+            ),
+            filled: true,
+            fillColor: const Color(0xFFFAFAFA),
+            hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1044,23 +1237,44 @@ class _AddCourseState extends State<AddCourse> {
     required Function(String?) onChanged,
     required IconData prefixIcon,
   }) {
-    return InputDecorator(
-      decoration: InputDecoration(
-        labelText: labelText,
-        prefixIcon: Icon(prefixIcon),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        filled: true,
-        fillColor: Colors.white,
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isDense: true,
-          isExpanded: true,
-          items: items,
-          onChanged: onChanged,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          labelText,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF374151),
+            letterSpacing: 0.5,
+          ),
         ),
-      ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFFAFAFA),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: DropdownButtonFormField<String>(
+            value: value,
+            decoration: InputDecoration(
+              prefixIcon:
+                  Icon(prefixIcon, color: const Color(0xFF6B7280), size: 20),
+              border: InputBorder.none,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+            items: items,
+            onChanged: onChanged,
+            dropdownColor: Colors.white,
+            style: const TextStyle(
+              color: Color(0xFF374151),
+              fontSize: 16,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

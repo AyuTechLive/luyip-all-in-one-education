@@ -1,147 +1,98 @@
 import 'package:flutter/material.dart';
-import 'package:luyip_website_edu/Courses/addvideo.dart';
-import 'package:luyip_website_edu/Courses/allcourses.dart';
-import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/add_internship.dart';
-import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/franchise_content.dart';
-import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/manage_test.dart';
-import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/payment_content.dart';
-import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/students.dart';
-import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/teachers.dart';
-import 'package:luyip_website_edu/admin_dashboard/dummyadmin.dart';
-import 'package:luyip_website_edu/admin_dashboard/payment_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:luyip_website_edu/auth/auth_service.dart';
-import 'package:luyip_website_edu/auth/loginscreen.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
-import 'package:luyip_website_edu/website/student_home_content.dart';
 
-// Create a main dashboard container that will hold both sidebar and content
-class AdminDashboardContainer extends StatefulWidget {
-  const AdminDashboardContainer({Key? key, this.initialPage = 'Dashboard'})
-      : super(key: key);
-
-  final String initialPage;
-
-  @override
-  State<AdminDashboardContainer> createState() =>
-      _AdminDashboardContainerState();
-}
-
-class _AdminDashboardContainerState extends State<AdminDashboardContainer> {
-  late String _currentPage;
-  late Widget _currentContent;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentPage = widget.initialPage;
-    _currentContent = _getContentForPage(_currentPage);
-  }
-
-  Widget _getContentForPage(String pageName) {
-    // Return the appropriate content widget based on page name
-    switch (pageName) {
-      case 'Dashboard':
-        return const DashboardContent();
-      case 'Courses':
-        return const AllCoursesScreen(userType: "admin");
-      case 'Students':
-        return const StudentsContent();
-      case 'Teachers':
-        return const TeachersContent();
-      case 'Franchises': // Add this new case
-        return const FranchisesContent();
-      case 'Internship':
-        return const AdminInternshipPage();
-      case 'Assessments':
-        return const AssessmentsContent();
-      case 'Schedule':
-        return const ScheduleContent();
-      case 'Payments':
-        return const PaymentsScreen();
-      case 'Notifications':
-        return const NotificationsContent();
-      case 'Settings':
-        return const WebsiteGeneralAdminPage();
-      default:
-        return const DashboardContent();
-    }
-  }
-
-  void _changePage(String pageName) {
-    setState(() {
-      _currentPage = pageName;
-      _currentContent = _getContentForPage(pageName);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        title: Text(
-          'Luyip Admin Dashboard - $_currentPage',
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        backgroundColor: ColorManager.primary,
-        actions: [
-          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {},
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: CircleAvatar(
-              backgroundColor: ColorManager.primaryLight,
-              child: IconButton(
-                icon: Icon(
-                  Icons.person_outline,
-                  color: ColorManager.primaryDark,
-                ),
-                onPressed: () {},
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: Container(
-        color: ColorManager.background,
-        child: Row(
-          children: [
-            // Pass the current page and page change callback to sidebar
-            DashboardSidebar(
-              selectedPage: _currentPage,
-              onPageChanged: _changePage,
-            ),
-
-            // Dynamic content area based on selected page
-            Expanded(child: _currentContent),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Modified sidebar that takes a callback for page changes
-class DashboardSidebar extends StatelessWidget {
+class TeacherDashboardSidebar extends StatefulWidget {
   final String selectedPage;
   final Function(String) onPageChanged;
 
-  const DashboardSidebar({
+  const TeacherDashboardSidebar({
     Key? key,
     required this.selectedPage,
     required this.onPageChanged,
   }) : super(key: key);
 
   @override
+  State<TeacherDashboardSidebar> createState() =>
+      _TeacherDashboardSidebarState();
+}
+
+class _TeacherDashboardSidebarState extends State<TeacherDashboardSidebar> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  String _teacherName = "Teacher";
+  String _teacherEmail = "";
+  String _teacherInitial = "T";
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTeacherInfo();
+  }
+
+  Future<void> _loadTeacherInfo() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Get current user
+      User? user = _auth.currentUser;
+      if (user != null) {
+        // Set email from Firebase Auth
+        setState(() {
+          _teacherEmail = user.email ?? "";
+
+          // Set initial based on email if available
+          if (_teacherEmail.isNotEmpty) {
+            _teacherInitial = _teacherEmail[0].toUpperCase();
+          }
+        });
+
+        // Query Firestore for teacher's name
+        final QuerySnapshot snapshot = await _firestore
+            .collection('Users')
+            .doc('teacher')
+            .collection('accounts')
+            .where('Email', isEqualTo: _teacherEmail)
+            .limit(1)
+            .get();
+
+        if (snapshot.docs.isNotEmpty) {
+          final teacherData =
+              snapshot.docs.first.data() as Map<String, dynamic>;
+
+          setState(() {
+            // Get teacher name from Firestore
+            _teacherName = teacherData['Name'] ?? "Teacher";
+
+            // If we have a name, use the first letter as initial
+            if (_teacherName.isNotEmpty) {
+              _teacherInitial = _teacherName[0].toUpperCase();
+            }
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading teacher info: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: double.infinity, // Ensures it fills the entire height
-      width: 250, // Keeps the fixed width for the sidebar
+      width: 250, // Fixed width for the sidebar
       child: Container(
-        color: ColorManager.dark, // Using dark slate instead of pure black
+        color: ColorManager.dark, // Using dark slate for the sidebar
         child: Column(
           children: [
             const SizedBox(height: 20),
@@ -151,7 +102,7 @@ class DashboardSidebar extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [ColorManager.primary, ColorManager.primaryDark],
+                  colors: [const Color(0xFF5E4DCD), const Color(0xFF483AAB)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -159,11 +110,11 @@ class DashboardSidebar extends StatelessWidget {
               ),
               child: const Center(
                 child: Text(
-                  "LUYIP",
+                  "TEACHER PORTAL",
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    fontSize: 22,
+                    fontSize: 20,
                     letterSpacing: 1.5,
                   ),
                 ),
@@ -171,47 +122,61 @@ class DashboardSidebar extends StatelessWidget {
             ),
             const SizedBox(height: 30),
 
-            // Admin profile section
+            // Teacher profile section
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: ColorManager.primaryLight,
-                    child: Text(
-                      "A",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: ColorManager.primaryDark,
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
                       ),
+                    )
+                  : Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundColor:
+                              const Color(0xFF5E4DCD).withOpacity(0.3),
+                          child: Text(
+                            _teacherInitial,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _teacherName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                maxLines: 1,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _teacherEmail,
+                                style: TextStyle(
+                                  color: ColorManager.light.withOpacity(0.7),
+                                  fontSize: 12,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                maxLines: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Admin User",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        "System Administrator",
-                        style: TextStyle(
-                          color: ColorManager.light.withOpacity(0.7),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
             ),
 
             const SizedBox(height: 24),
@@ -251,32 +216,27 @@ class DashboardSidebar extends StatelessWidget {
                       context,
                       Icons.dashboard_outlined,
                       'Dashboard',
-                      isActive: selectedPage == 'Dashboard',
+                      isActive: widget.selectedPage == 'Dashboard',
                     ),
                     _buildSidebarItem(
                       context,
                       Icons.school_outlined,
-                      'Courses',
-                      isActive: selectedPage == 'Courses',
+                      'My Courses',
+                      isActive: widget.selectedPage == 'My Courses',
                     ),
                     _buildSidebarItem(
                       context,
                       Icons.people_outlined,
                       'Students',
-                      isActive: selectedPage == 'Students',
+                      isActive: widget.selectedPage == 'Students',
                     ),
-                    _buildSidebarItem(
-                      context,
-                      Icons.person_outlined,
-                      'Teachers',
-                      isActive: selectedPage == 'Teachers',
-                    ),
-                    _buildSidebarItem(
-                      context,
-                      Icons.store_outlined,
-                      'Franchises',
-                      isActive: selectedPage == 'Franchises',
-                    ),
+                    // _buildSidebarItem(
+                    //   context,
+                    //   Icons.assignment_outlined,
+                    //   'Assignments',
+                    //   isActive: widget.selectedPage == 'Assignments',
+                    //   badge: '3',
+                    // ),
 
                     const SizedBox(height: 16),
                     const Divider(
@@ -288,7 +248,7 @@ class DashboardSidebar extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
 
-                    // Management section title
+                    // Teaching section title
                     Padding(
                       padding: const EdgeInsets.only(
                         left: 16,
@@ -298,7 +258,7 @@ class DashboardSidebar extends StatelessWidget {
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          "MANAGEMENT",
+                          "TEACHING",
                           style: TextStyle(
                             color: ColorManager.textLight,
                             fontSize: 12,
@@ -309,32 +269,30 @@ class DashboardSidebar extends StatelessWidget {
                       ),
                     ),
 
-                    _buildSidebarItem(
-                      context,
-                      Icons.library_books_outlined,
-                      'Internship',
-                      isActive: selectedPage == 'Internship',
-                    ),
                     // _buildSidebarItem(
                     //   context,
-                    //   Icons.assessment_outlined,
-                    //   'Assessments',
-                    //   isActive: selectedPage == 'Assessments',
-                    //   badge: '3',
+                    //   Icons.fact_check_outlined,
+                    //   'Attendance',
+                    //   isActive: widget.selectedPage == 'Attendance',
+                    // ),
+                    // _buildSidebarItem(
+                    //   context,
+                    //   Icons.grading_outlined,
+                    //   'Grades',
+                    //   isActive: widget.selectedPage == 'Grades',
                     // ),
                     // _buildSidebarItem(
                     //   context,
                     //   Icons.event_outlined,
-                    //   'Schedule',
-                    //   isActive: selectedPage == 'Schedule',
+                    //   'Calendar',
+                    //   isActive: widget.selectedPage == 'Calendar',
                     // ),
-                    _buildSidebarItem(
-                      context,
-                      Icons.payment_outlined,
-                      'Payments',
-                      isActive: selectedPage == 'Payments',
-                      badge: '5',
-                    ),
+                    // _buildSidebarItem(
+                    //   context,
+                    //   Icons.folder_outlined,
+                    //   'Resources',
+                    //   isActive: widget.selectedPage == 'Resources',
+                    // ),
 
                     const SizedBox(height: 16),
                     const Divider(
@@ -346,7 +304,7 @@ class DashboardSidebar extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
 
-                    // System section title
+                    // Profile & Settings section title
                     Padding(
                       padding: const EdgeInsets.only(
                         left: 16,
@@ -356,7 +314,7 @@ class DashboardSidebar extends StatelessWidget {
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          "SYSTEM",
+                          "PERSONAL",
                           style: TextStyle(
                             color: ColorManager.textLight,
                             fontSize: 12,
@@ -367,18 +325,24 @@ class DashboardSidebar extends StatelessWidget {
                       ),
                     ),
 
+                    // _buildSidebarItem(
+                    //   context,
+                    //   Icons.message_outlined,
+                    //   'Messages',
+                    //   isActive: widget.selectedPage == 'Messages',
+                    //   badge: '5',
+                    // ),
                     _buildSidebarItem(
                       context,
-                      Icons.notifications_outlined,
-                      'Notifications',
-                      isActive: selectedPage == 'Notifications',
-                      badge: '12',
+                      Icons.person_outlined,
+                      'Profile',
+                      isActive: widget.selectedPage == 'Profile',
                     ),
                     _buildSidebarItem(
                       context,
                       Icons.settings_outlined,
                       'Settings',
-                      isActive: selectedPage == 'Settings',
+                      isActive: widget.selectedPage == 'Settings',
                     ),
                   ],
                 ),
@@ -434,13 +398,13 @@ class DashboardSidebar extends StatelessWidget {
   }) {
     return GestureDetector(
       onTap: () {
-        // Use the callback to change the page instead of navigating
-        onPageChanged(label);
+        // Use the callback to change the page
+        widget.onPageChanged(label);
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-          color: isActive ? ColorManager.primary : Colors.transparent,
+          color: isActive ? const Color(0xFF5E4DCD) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -471,13 +435,13 @@ class DashboardSidebar extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isActive
                       ? Colors.white
-                      : ColorManager.secondary.withOpacity(0.8),
+                      : const Color(0xFF5E4DCD).withOpacity(0.8),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   badge,
                   style: TextStyle(
-                    color: isActive ? ColorManager.primary : Colors.white,
+                    color: isActive ? const Color(0xFF5E4DCD) : Colors.white,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),

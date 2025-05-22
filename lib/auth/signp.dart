@@ -7,7 +7,9 @@ import 'package:luyip_website_edu/helpers/utils.dart';
 import 'package:luyip_website_edu/home/main_page.dart';
 
 class SignUpScreen extends StatefulWidget {
-  const SignUpScreen({super.key});
+  final String? userRole; // Role parameter from previous screen (optional)
+
+  const SignUpScreen({super.key, this.userRole});
 
   @override
   State<SignUpScreen> createState() => _SignUpScreenState();
@@ -19,22 +21,69 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final nameController = TextEditingController();
+  final phoneController = TextEditingController();
   bool _isPasswordVisible = false;
-  String selectedRole = 'student'; // Default role selection
+  late String selectedRole; // Will be set from parameter or default to student
+  bool _acceptedTerms = false;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    // Set role from parameter or default to 'student'
+    selectedRole = widget.userRole ?? 'student';
+  }
 
   @override
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
     nameController.dispose();
+    phoneController.dispose();
     super.dispose();
+  }
+
+  // Get role display name
+  String getRoleDisplayName() {
+    switch (selectedRole) {
+      case 'student':
+        return 'Student';
+      case 'teacher':
+        return 'Teacher';
+      case 'franchise':
+        return 'Franchise';
+      case 'admin':
+        return 'Admin';
+      default:
+        return 'Student';
+    }
+  }
+
+  // Get role icon
+  IconData getRoleIcon() {
+    switch (selectedRole) {
+      case 'student':
+        return Icons.school;
+      case 'teacher':
+        return Icons.person_outline;
+      case 'franchise':
+        return Icons.business;
+      case 'admin':
+        return Icons.admin_panel_settings;
+      default:
+        return Icons.school;
+    }
   }
 
   Future<void> signUp() async {
     if (_formfield.currentState!.validate()) {
+      if (!_acceptedTerms) {
+        Utils().toastMessage('Please accept the terms and conditions');
+        return;
+      }
+
       setState(() {
         loading = true;
       });
@@ -52,14 +101,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
         String formattedDate =
             '${currentDate.day}-${currentDate.month}-${currentDate.year}';
 
-        // Create user data map
+        // Create user data map with "added by" information
         Map<String, dynamic> userData = {
           'Email': emailController.text.trim(),
           'UID': userCredential.user!.uid,
           'Name': nameController.text.trim(),
+          'Phone': phoneController.text.trim(),
           'Role': selectedRole,
           'DOJ': formattedDate,
           'My Courses': [],
+          'AddedBy': 'self', // Self registration
+          'SelfRegistered': true,
+          'AddedDate': formattedDate,
         };
 
         // Store in role-specific collection
@@ -160,7 +213,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.person_add,
+                    getRoleIcon(),
                     color: ColorManager.primary,
                     size: 60,
                   ),
@@ -168,7 +221,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 const SizedBox(height: 32),
                 // Branding text
                 Text(
-                  'JOIN LUYIP EDUCATION',
+                  'JOIN LUIYP EDUCATION',
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
@@ -241,7 +294,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.person_add,
+                    getRoleIcon(),
                     color: ColorManager.primary,
                     size: 40,
                   ),
@@ -332,7 +385,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.person_add,
+                    getRoleIcon(),
                     color: ColorManager.primary,
                     size: 30,
                   ),
@@ -397,36 +450,94 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Signup header
-        Text(
-          'Sign Up',
-          style: TextStyle(
-            fontSize: isSmallScreen ? 24 : 30,
-            fontWeight: FontWeight.bold,
-            color: ColorManager.textDark,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Create your account to start learning',
-          style: TextStyle(
-            fontSize: isSmallScreen ? 14 : 16,
-            color: ColorManager.textMedium,
-          ),
+        // Signup header with role indicator
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Sign Up',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 24 : 30,
+                      fontWeight: FontWeight.bold,
+                      color: ColorManager.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Create your account to start learning',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 14 : 16,
+                      color: ColorManager.textMedium,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Role indicator badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: ColorManager.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: ColorManager.primary.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    getRoleIcon(),
+                    color: ColorManager.primary,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    getRoleDisplayName(),
+                    style: TextStyle(
+                      color: ColorManager.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 24),
 
-        // Role selection
-        Text(
-          'Register as:',
-          style: TextStyle(
-            fontSize: isSmallScreen ? 14 : 16,
-            fontWeight: FontWeight.w600,
-            color: ColorManager.textDark,
+        // Registration type indicator
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: ColorManager.primaryLight.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: ColorManager.primary.withOpacity(0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.person_outline,
+                color: ColorManager.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Self Registration',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: ColorManager.primary,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 12),
-        _buildRoleSelector(),
         const SizedBox(height: 24),
 
         // Signup form
@@ -468,6 +579,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 },
               ),
               const SizedBox(height: 20),
+              _buildTextField(
+                controller: phoneController,
+                labelText: 'Phone Number',
+                hintText: 'Enter your phone number',
+                prefixIcon: Icons.phone_outlined,
+                keyboardType: TextInputType.phone,
+                validator: (value) {
+                  if (value!.isEmpty) {
+                    return 'Please enter your phone number';
+                  }
+                  if (value.length < 10) {
+                    return 'Please enter a valid phone number';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 20),
               _buildPasswordField(),
               const SizedBox(height: 12),
               _buildTermsAndConditionsCheckbox(),
@@ -479,48 +607,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildRoleSelector() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        children: [
-          _buildRoleChip('Student', 'student'),
-          _buildRoleChip('Teacher', 'teacher'),
-          _buildRoleChip('Franchise', 'franchise'),
-          _buildRoleChip('Admin', 'admin'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRoleChip(String label, String role) {
-    final isSelected = selectedRole == role;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) => setState(() => selectedRole = role),
-      labelStyle: TextStyle(
-        color: isSelected ? Colors.white : ColorManager.textDark,
-        fontWeight: FontWeight.w500,
-      ),
-      backgroundColor: Colors.white,
-      selectedColor: ColorManager.primary,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: isSelected ? ColorManager.primary : Colors.grey.shade300,
-        ),
-      ),
     );
   }
 
@@ -605,8 +691,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  bool _acceptedTerms = false;
-
   Widget _buildTermsAndConditionsCheckbox() {
     return Row(
       children: [
@@ -656,8 +740,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   strokeWidth: 2,
                 ),
               )
-            : const Text(
-                'Create Account',
+            : Text(
+                'Create ${getRoleDisplayName()} Account',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -683,7 +767,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
           onPressed: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => LoginScreen()),
+              MaterialPageRoute(
+                  builder: (context) => LoginScreen(
+                        userRole: selectedRole,
+                      )),
             );
           },
           style: TextButton.styleFrom(

@@ -100,14 +100,14 @@ class _StudentIDCardScreenState extends State<StudentIDCardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ColorManager.background,
-      appBar: AppBar(
-        backgroundColor: ColorManager.primary,
-        title: const Text(
-          'Student ID Card',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        elevation: 0,
-      ),
+      // appBar: AppBar(
+      //   backgroundColor: ColorManager.primary,
+      //   // title: const Text(
+      //   //   'Student ID Card',
+      //   //   style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      //   // ),
+      //   elevation: 0,
+      // ),
       body: isLoading
           ? const Center(
               child: CircularProgressIndicator(color: ColorManager.primary),
@@ -265,7 +265,7 @@ class _StudentIDCardScreenState extends State<StudentIDCardScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: const [
                             Text(
-                              "LUYIP EDUCATION",
+                              "LUIYP EDUCATION",
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -384,7 +384,7 @@ class _StudentIDCardScreenState extends State<StudentIDCardScreen> {
                       child: Column(
                         children: [
                           QrImageView(
-                            data: 'LUYIP-MEMBER-${studentData!['UID']}',
+                            data: 'LUIYP-MEMBER-${studentData!['UID']}',
                             version: QrVersions.auto,
                             size: 120,
                             backgroundColor: Colors.white,
@@ -429,7 +429,7 @@ class _StudentIDCardScreenState extends State<StudentIDCardScreen> {
                     child: Column(
                       children: [
                         Text(
-                          'This ID card is the property of LUYIP Education.',
+                          'This ID card is the property of LUIYP Education.',
                           style: TextStyle(
                             color: ColorManager.textMedium,
                             fontSize: 12,

@@ -9,11 +9,15 @@ import 'package:luyip_website_edu/Courses/course_details/course_details.dart';
 import 'package:luyip_website_edu/admin_dashboard/sidebar.dart';
 import 'package:luyip_website_edu/auth/loginscreen.dart';
 import 'package:luyip_website_edu/firebase_options.dart';
+import 'package:luyip_website_edu/franchise_dahsboard/franchise_dashboard.dart';
+import 'package:luyip_website_edu/helpers/colors.dart';
+import 'package:luyip_website_edu/helpers/coming_soon.dart';
 import 'package:luyip_website_edu/home/admin_dashboard.dart';
-import 'package:luyip_website_edu/home/franchise_dashboard.dart';
+
 import 'package:luyip_website_edu/home/student_dashboard.dart';
-import 'package:luyip_website_edu/home/teacher_dashboard.dart';
+
 import 'package:luyip_website_edu/student_dashboard/student_dashboard.dart';
+import 'package:luyip_website_edu/teacher/teacherdashboard.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -382,7 +386,12 @@ class _HomePageState extends State<HomePage> {
                     slivers: [
                       // Top Navigation Bar padding for fixed navbar
                       SliverToBoxAdapter(
-                        child: SizedBox(height: isScrolled ? 70 : 0),
+                        child: SizedBox(
+                            height: isMobile
+                                ? 80
+                                : (isScrolled
+                                    ? 70
+                                    : 0)), // Increased mobile height
                       ),
 
                       // Hero Banner with dynamic content
@@ -540,7 +549,7 @@ class _NavBarState extends State<NavBar> {
                   ),
                   const SizedBox(width: 8),
                   const Text(
-                    'Luyip Education',
+                    'Luiyp Education',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
@@ -563,18 +572,39 @@ class _NavBarState extends State<NavBar> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const Placeholder(
-                              child: Center(child: Text('All Courses Screen')),
+                              builder: (context) =>
+                                  AllCoursesScreen(userType: 'student')),
+                        );
+                      }),
+                      _buildNavigationItem('Franchise', () {
+                        // Navigate to franchise info screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const LoginScreen(
+                              userRole: 'franchise',
                             ),
                           ),
                         );
                       }),
-                      _buildNavigationItem('Internship', () {
-                        // Just a placeholder, no navigation required
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text(
-                                  'Internship opportunities coming soon!')),
+                      _buildNavigationItem('Teacher', () {
+                        // Navigate to teacher info screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const LoginScreen(
+                              userRole: 'teacher',
+                            ),
+                          ),
+                        );
+                      }),
+                      _buildNavigationItem('Verify Certificate', () {
+                        // Navigate to certificate verification screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const ComingSoonScreen(
+                                  pageName: 'Page not found')),
                         );
                       }),
                       _buildNavigationItem('About Us', () {
@@ -616,7 +646,9 @@ class _NavBarState extends State<NavBar> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => const LoginScreen()),
+                          builder: (context) => const LoginScreen(
+                                userRole: 'student',
+                              )),
                     );
                   },
                   style: ElevatedButton.styleFrom(
@@ -656,11 +688,82 @@ class _NavBarState extends State<NavBar> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildMobileMenuItem('Home', Icons.home),
-                  _buildMobileMenuItem('Courses', Icons.school),
-                  _buildMobileMenuItem('Internship', Icons.work),
-                  _buildMobileMenuItem('About Us', Icons.info),
-                  _buildMobileMenuItem('Contact', Icons.contact_phone),
+                  _buildMobileMenuItem('Home', Icons.home, () {
+                    setState(() {
+                      _showMenu = false;
+                    });
+                  }),
+                  _buildMobileMenuItem('Courses', Icons.school, () {
+                    setState(() {
+                      _showMenu = false;
+                    });
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const Placeholder(
+                          child: Center(child: Text('All Courses Screen')),
+                        ),
+                      ),
+                    );
+                  }),
+                  _buildMobileMenuItem('Franchise', Icons.business, () {
+                    setState(() {
+                      _showMenu = false;
+                    });
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginScreen(
+                          userRole: 'franchise',
+                        ),
+                      ),
+                    );
+                  }),
+                  _buildMobileMenuItem('Teacher', Icons.person_outline, () {
+                    setState(() {
+                      _showMenu = false;
+                    });
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginScreen(
+                          userRole: 'teacher',
+                        ),
+                      ),
+                    );
+                  }),
+                  _buildMobileMenuItem('Verify Certificate', Icons.verified,
+                      () {
+                    setState(() {
+                      _showMenu = false;
+                    });
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginScreen(
+                          userRole: '',
+                        ),
+                      ),
+                    );
+                  }),
+                  _buildMobileMenuItem('About Us', Icons.info, () {
+                    setState(() {
+                      _showMenu = false;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('About Us section coming soon!')),
+                    );
+                  }),
+                  _buildMobileMenuItem('Contact', Icons.contact_phone, () {
+                    setState(() {
+                      _showMenu = false;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Contact information coming soon!')),
+                    );
+                  }),
                   const Divider(),
                   Padding(
                     padding: const EdgeInsets.all(12.0),
@@ -669,7 +772,9 @@ class _NavBarState extends State<NavBar> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => const LoginScreen()),
+                              builder: (context) => const LoginScreen(
+                                    userRole: 'student',
+                                  )),
                         );
                       },
                       style: ElevatedButton.styleFrom(
@@ -690,14 +795,14 @@ class _NavBarState extends State<NavBar> {
 
   Widget _buildNavigationItem(String title, VoidCallback onTap) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: TextButton(
         onPressed: onTap,
         child: Text(
           title,
           style: TextStyle(
             color: Colors.black87,
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -705,19 +810,9 @@ class _NavBarState extends State<NavBar> {
     );
   }
 
-  Widget _buildMobileMenuItem(String title, IconData icon) {
+  Widget _buildMobileMenuItem(String title, IconData icon, VoidCallback onTap) {
     return InkWell(
-      onTap: () {
-        // Handle menu item tap
-        setState(() {
-          _showMenu = false;
-        });
-
-        // Show a snackbar for now
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$title tapped')),
-        );
-      },
+      onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         child: Row(
@@ -755,8 +850,10 @@ class HeroBanner extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding:
-          EdgeInsets.symmetric(vertical: isMobile ? 20 : 40, horizontal: 20),
+      padding: EdgeInsets.symmetric(
+        vertical: isMobile ? 30 : 40, // Increased mobile padding
+        horizontal: 20,
+      ),
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
         image: const DecorationImage(
@@ -768,40 +865,50 @@ class HeroBanner extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const SizedBox(height: 20),
+          SizedBox(height: isMobile ? 10 : 40), // Reduced top spacing on mobile
 
-          // Main Title
+          // Main Title - Updated for better mobile visibility
           Container(
-            constraints: BoxConstraints(maxWidth: 800),
+            constraints: BoxConstraints(
+              maxWidth: isMobile
+                  ? screenSize.width - 40
+                  : 800, // Full width minus padding on mobile
+            ),
             child: Text(
               'Building Futures Through Quality Education',
               style: TextStyle(
-                fontSize: isMobile ? 28 : 42,
+                fontSize: isMobile
+                    ? 24
+                    : 42, // Slightly smaller on mobile but still visible
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
-                height: 1.2,
+                height: isMobile ? 1.3 : 1.2, // Better line height for mobile
               ),
               textAlign: TextAlign.center,
+              maxLines: isMobile ? 3 : 2, // Allow more lines on mobile
             ),
           ),
 
-          const SizedBox(height: 16),
+          SizedBox(height: isMobile ? 12 : 16),
 
-          // Subtitle
+          // Subtitle - Updated for mobile
           Container(
-            constraints: BoxConstraints(maxWidth: 700),
+            constraints: BoxConstraints(
+              maxWidth: isMobile ? screenSize.width - 40 : 700,
+            ),
             child: Text(
-              'Luyip Education aims to transform education in India by providing affordable and quality learning opportunities for all.',
+              'Luiyp Education aims to transform education in India by providing affordable and quality learning opportunities for all.',
               style: TextStyle(
-                fontSize: isMobile ? 16 : 18,
+                fontSize: isMobile ? 14 : 18,
                 color: Colors.black54,
                 height: 1.5,
               ),
               textAlign: TextAlign.center,
+              maxLines: isMobile ? 4 : 3, // Allow more lines on mobile
             ),
           ),
 
-          const SizedBox(height: 40),
+          SizedBox(height: isMobile ? 30 : 40), // Reduced spacing on mobile
 
           // Image Carousel Slider with dynamic content
           ImageCarouselSlider(
@@ -809,62 +916,47 @@ class HeroBanner extends StatelessWidget {
             getColorFromString: getColorFromString,
           ),
 
-          // "Bharat's Trusted" section only for larger screens
-          if (!isMobile)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 60),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  RichText(
-                    textAlign: TextAlign.center,
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: "Bharat's ",
-                          style: TextStyle(
-                            fontSize: isMobile ? 28 : 42,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        TextSpan(
-                          text: "Trusted & ",
-                          style: TextStyle(
-                            fontSize: isMobile ? 28 : 42,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF5E4DCD),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  RichText(
-                    textAlign: TextAlign.center,
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: "Affordable ",
-                          style: TextStyle(
-                            fontSize: isMobile ? 28 : 42,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF5E4DCD),
-                          ),
-                        ),
-                        TextSpan(
-                          text: "Educational Platform",
-                          style: TextStyle(
-                            fontSize: isMobile ? 28 : 42,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+          // "Bharat's Trusted" section - Modified for mobile
+          Container(
+            padding: EdgeInsets.symmetric(
+              vertical: isMobile ? 40 : 60, // Reduced padding on mobile
             ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // First line
+                Text(
+                  "Bharat's ",
+                  style: TextStyle(
+                    fontSize: isMobile ? 20 : 42, // Much smaller on mobile
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                // Second line
+                Text(
+                  "Trusted & Affordable",
+                  style: TextStyle(
+                    fontSize: isMobile ? 20 : 42,
+                    fontWeight: FontWeight.bold,
+                    color: ColorManager.primary, // Using consistent color
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                // Third line
+                Text(
+                  "Educational Platform",
+                  style: TextStyle(
+                    fontSize: isMobile ? 20 : 42,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1036,7 +1128,9 @@ class _ImageCarouselSliderState extends State<ImageCarouselSlider> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
+                      builder: (context) => const LoginScreen(
+                        userRole: 'student',
+                      ),
                     ),
                   );
                 },
@@ -1187,7 +1281,9 @@ class _ImageCarouselSliderState extends State<ImageCarouselSlider> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const LoginScreen(),
+                builder: (context) => const LoginScreen(
+                  userRole: 'student',
+                ),
               ),
             );
           },
@@ -1473,7 +1569,7 @@ class PlatformStatsSection extends StatelessWidget {
           Container(
             constraints: const BoxConstraints(maxWidth: 700),
             child: Text(
-              'Join millions of students who have already transformed their educational journey with Luyip Education',
+              'Join millions of students who have already transformed their educational journey with Luiyp Education',
               style: TextStyle(
                 fontSize: isMobile ? 14 : 16,
                 color: Colors.black54,
@@ -2810,7 +2906,7 @@ class GetStartedSection extends StatelessWidget {
           Container(
             constraints: const BoxConstraints(maxWidth: 800),
             child: Text(
-              'Join Luyip Education today and experience the best in educational content, expert guidance, and comprehensive exam preparation.',
+              'Join Luiyp Education today and experience the best in educational content, expert guidance, and comprehensive exam preparation.',
               style: TextStyle(
                 fontSize: isMobile ? 16 : 18,
                 color: Colors.white.withOpacity(0.9),
@@ -2828,7 +2924,9 @@ class GetStartedSection extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
+                      builder: (context) => const LoginScreen(
+                        userRole: 'student',
+                      ),
                     ),
                   );
                 },
@@ -2878,6 +2976,80 @@ class GetStartedSection extends StatelessWidget {
 class Footer extends StatelessWidget {
   const Footer({Key? key}) : super(key: key);
 
+  // Navigation helper method
+  void _navigateToPage(BuildContext context, String pageName) {
+    Widget targetPage;
+
+    switch (pageName) {
+      case 'About Us':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'Courses':
+        targetPage = const AllCoursesScreen(userType: 'Page not found');
+        break;
+      case 'Study Materials':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'Test Series':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'Success Stories':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'Blog':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'Admin':
+        targetPage = const LoginScreen(userRole: 'admin');
+        break;
+      case 'NCERT Solutions':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'Sample Papers':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'Previous Year Papers':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'Scholarships':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'Career Guidance':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'FAQ':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'Terms & Conditions':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'Privacy Policy':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'Refund Policy':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'Cookie Policy':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'Disclaimer':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      case 'Contact Us':
+        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        break;
+      default:
+        // For unhandled cases, show a coming soon screen
+        targetPage = ComingSoonScreen(pageName: pageName);
+        break;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => targetPage),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final Size screenSize = MediaQuery.of(context).size;
@@ -2893,7 +3065,9 @@ class Footer extends StatelessWidget {
       child: Column(
         children: [
           // Footer content
-          isMobile ? _buildMobileFooterContent() : _buildDesktopFooterContent(),
+          isMobile
+              ? _buildMobileFooterContent(context)
+              : _buildDesktopFooterContent(context),
 
           const SizedBox(height: 40),
           const Divider(color: Colors.grey),
@@ -2905,7 +3079,7 @@ class Footer extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '© ${DateTime.now().year} Luyip Education. All rights reserved.',
+                  '© ${DateTime.now().year} Luiyp Education. All rights reserved.',
                   style: TextStyle(
                     color: Colors.grey.shade400,
                   ),
@@ -2922,7 +3096,7 @@ class Footer extends StatelessWidget {
     );
   }
 
-  Widget _buildDesktopFooterContent() {
+  Widget _buildDesktopFooterContent(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2941,7 +3115,7 @@ class Footer extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
-                      'lE',
+                      'LE',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -2951,7 +3125,7 @@ class Footer extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   const Text(
-                    'Luyip Education',
+                    'Luiyp Education',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
@@ -2962,7 +3136,7 @@ class Footer extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Luyip Education is India\'s leading educational platform dedicated to providing affordable and quality education to students across the country.',
+                'Luiyp Education is India\'s leading educational platform dedicated to providing affordable and quality education to students across the country.',
                 style: TextStyle(
                   color: Colors.grey.shade400,
                   height: 1.5,
@@ -2978,7 +3152,7 @@ class Footer extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'support@luyipedu.com',
+                    'support@luiypedu.com',
                     style: TextStyle(
                       color: Colors.grey.shade400,
                     ),
@@ -3023,12 +3197,13 @@ class Footer extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              _buildFooterLink('About Us'),
-              _buildFooterLink('Courses'),
-              _buildFooterLink('Study Materials'),
-              _buildFooterLink('Test Series'),
-              _buildFooterLink('Success Stories'),
-              _buildFooterLink('Blog'),
+              _buildFooterLink(context, 'About Us'),
+              _buildFooterLink(context, 'Courses'),
+              _buildFooterLink(context, 'Study Materials'),
+              _buildFooterLink(context, 'Test Series'),
+              _buildFooterLink(context, 'Success Stories'),
+              _buildFooterLink(context, 'Blog'),
+              _buildFooterLink(context, 'Admin'),
             ],
           ),
         ),
@@ -3050,12 +3225,12 @@ class Footer extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              _buildFooterLink('NCERT Solutions'),
-              _buildFooterLink('Sample Papers'),
-              _buildFooterLink('Previous Year Papers'),
-              _buildFooterLink('Scholarships'),
-              _buildFooterLink('Career Guidance'),
-              _buildFooterLink('FAQ'),
+              _buildFooterLink(context, 'NCERT Solutions'),
+              _buildFooterLink(context, 'Sample Papers'),
+              _buildFooterLink(context, 'Previous Year Papers'),
+              _buildFooterLink(context, 'Scholarships'),
+              _buildFooterLink(context, 'Career Guidance'),
+              _buildFooterLink(context, 'FAQ'),
             ],
           ),
         ),
@@ -3077,12 +3252,12 @@ class Footer extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              _buildFooterLink('Terms & Conditions'),
-              _buildFooterLink('Privacy Policy'),
-              _buildFooterLink('Refund Policy'),
-              _buildFooterLink('Cookie Policy'),
-              _buildFooterLink('Disclaimer'),
-              _buildFooterLink('Contact Us'),
+              _buildFooterLink(context, 'Terms & Conditions'),
+              _buildFooterLink(context, 'Privacy Policy'),
+              _buildFooterLink(context, 'Refund Policy'),
+              _buildFooterLink(context, 'Cookie Policy'),
+              _buildFooterLink(context, 'Disclaimer'),
+              _buildFooterLink(context, 'Contact Us'),
             ],
           ),
         ),
@@ -3090,7 +3265,7 @@ class Footer extends StatelessWidget {
     );
   }
 
-  Widget _buildMobileFooterContent() {
+  Widget _buildMobileFooterContent(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3114,7 +3289,7 @@ class Footer extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             const Text(
-              'Luyip Education',
+              'Luiyp Education',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
@@ -3125,7 +3300,7 @@ class Footer extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          'Luyip Education is India\'s leading educational platform dedicated to providing affordable and quality education to students across the country.',
+          'Luiyp Education is India\'s leading educational platform dedicated to providing affordable and quality education to students across the country.',
           style: TextStyle(
             color: Colors.grey.shade400,
             height: 1.5,
@@ -3141,7 +3316,7 @@ class Footer extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              'support@luyipedu.com',
+              'support@luiypedu.com',
               style: TextStyle(
                 color: Colors.grey.shade400,
               ),
@@ -3169,16 +3344,17 @@ class Footer extends StatelessWidget {
         const SizedBox(height: 30),
 
         // Expandable sections
-        _buildMobileExpandableSection('Quick Links', [
+        _buildMobileExpandableSection(context, 'Quick Links', [
           'About Us',
           'Courses',
           'Study Materials',
           'Test Series',
           'Success Stories',
           'Blog',
+          'Admin',
         ]),
 
-        _buildMobileExpandableSection('Resources', [
+        _buildMobileExpandableSection(context, 'Resources', [
           'NCERT Solutions',
           'Sample Papers',
           'Previous Year Papers',
@@ -3187,7 +3363,7 @@ class Footer extends StatelessWidget {
           'FAQ',
         ]),
 
-        _buildMobileExpandableSection('Legal', [
+        _buildMobileExpandableSection(context, 'Legal', [
           'Terms & Conditions',
           'Privacy Policy',
           'Refund Policy',
@@ -3199,7 +3375,8 @@ class Footer extends StatelessWidget {
     );
   }
 
-  Widget _buildMobileExpandableSection(String title, List<String> links) {
+  Widget _buildMobileExpandableSection(
+      BuildContext context, String title, List<String> links) {
     return Theme(
       data: ThemeData(
         dividerColor: Colors.transparent,
@@ -3219,18 +3396,16 @@ class Footer extends StatelessWidget {
         ),
         iconColor: Colors.white,
         collapsedIconColor: Colors.white,
-        children: links.map((link) => _buildFooterLink(link)).toList(),
+        children: links.map((link) => _buildFooterLink(context, link)).toList(),
       ),
     );
   }
 
-  Widget _buildFooterLink(String text) {
+  Widget _buildFooterLink(BuildContext context, String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () {
-          // Handle link tap
-        },
+        onTap: () => _navigateToPage(context, text),
         child: Text(
           text,
           style: TextStyle(
@@ -3276,3 +3451,5 @@ class Footer extends StatelessWidget {
     );
   }
 }
+
+// Generic Coming Soon Screen for unimplemented pages

@@ -143,7 +143,7 @@ class _StudentSidebarState extends State<StudentSidebar> {
                       children: [
                         if (widget.isExpanded)
                           const Text(
-                            "LUYIP",
+                            "LUIYP",
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -311,7 +311,12 @@ class _StudentSidebarState extends State<StudentSidebar> {
                             isActive: widget.selectedPage == 'Certificates',
                             badge: '2',
                           ),
-
+                          _buildSidebarItem(
+                            context,
+                            Icons.message_outlined,
+                            'Internship',
+                            isActive: widget.selectedPage == 'Internship',
+                          ),
                           if (widget.isExpanded) const SizedBox(height: 16),
                           Divider(
                             height: 1,
@@ -344,25 +349,25 @@ class _StudentSidebarState extends State<StudentSidebar> {
                               ),
                             ),
 
-                          _buildSidebarItem(
-                            context,
-                            Icons.calendar_today_outlined,
-                            'Schedule',
-                            isActive: widget.selectedPage == 'Schedule',
-                          ),
-                          _buildSidebarItem(
-                            context,
-                            Icons.assignment_outlined,
-                            'Assignments',
-                            isActive: widget.selectedPage == 'Assignments',
-                            badge: '4',
-                          ),
-                          _buildSidebarItem(
-                            context,
-                            Icons.library_books_outlined,
-                            'Library',
-                            isActive: widget.selectedPage == 'Library',
-                          ),
+                          // _buildSidebarItem(
+                          //   context,
+                          //   Icons.calendar_today_outlined,
+                          //   'Schedule',
+                          //   isActive: widget.selectedPage == 'Schedule',
+                          // ),
+                          // _buildSidebarItem(
+                          //   context,
+                          //   Icons.assignment_outlined,
+                          //   'Assignments',
+                          //   isActive: widget.selectedPage == 'Assignments',
+                          //   badge: '4',
+                          // ),
+                          // _buildSidebarItem(
+                          //   context,
+                          //   Icons.library_books_outlined,
+                          //   'Library',
+                          //   isActive: widget.selectedPage == 'Library',
+                          // ),
                           _buildSidebarItem(
                             context,
                             Icons.workspace_premium_outlined,
@@ -403,13 +408,6 @@ class _StudentSidebarState extends State<StudentSidebar> {
                               ),
                             ),
 
-                          _buildSidebarItem(
-                            context,
-                            Icons.message_outlined,
-                            'Messages',
-                            isActive: widget.selectedPage == 'Messages',
-                            badge: '5',
-                          ),
                           _buildSidebarItem(
                             context,
                             Icons.settings_outlined,

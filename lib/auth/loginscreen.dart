@@ -7,7 +7,9 @@ import 'package:luyip_website_edu/helpers/utils.dart';
 import 'package:luyip_website_edu/home/main_page.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final String? userRole; // Role parameter from previous screen
+
+  const LoginScreen({super.key, required this.userRole});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -19,10 +21,17 @@ class _LoginScreenState extends State<LoginScreen> {
   final passwordController = TextEditingController();
   bool _isPasswordVisible = false;
   bool loading = false;
-  String selectedRole = 'student'; // Default role selection
+  late String selectedRole; // Will be set from parameter or default to student
 
   final _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    // Set role from parameter or default to 'student'
+    selectedRole = widget.userRole ?? 'student';
+  }
 
   @override
   void dispose() {
@@ -73,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
               loading = false;
             });
             Utils().toastMessage(
-              'User not registered as $selectedRole. Please select the correct role.',
+              'User not registered as $selectedRole. Please check your credentials.',
             );
           }
         } catch (e) {
@@ -88,6 +97,57 @@ class _LoginScreenState extends State<LoginScreen> {
         });
         Utils().toastMessage(error.toString());
       });
+    }
+  }
+
+  // Get role display name
+  String getRoleDisplayName() {
+    switch (selectedRole) {
+      case 'student':
+        return 'Student';
+      case 'teacher':
+        return 'Teacher';
+      case 'franchise':
+        return 'Franchise';
+      case 'admin':
+        return 'Admin';
+      default:
+        return 'Student';
+    }
+  }
+
+  // Get role icon
+  IconData getRoleIcon() {
+    switch (selectedRole) {
+      case 'student':
+        return Icons.school;
+      case 'teacher':
+        return Icons.person_outline;
+      case 'franchise':
+        return Icons.business;
+      case 'admin':
+        return Icons.admin_panel_settings;
+      default:
+        return Icons.school;
+    }
+  }
+
+  // Check if current role allows self-registration
+  bool canSelfRegister() {
+    return selectedRole == 'student';
+  }
+
+  // Get appropriate message for non-registrable roles
+  String getRegistrationMessage() {
+    switch (selectedRole) {
+      case 'teacher':
+        return 'Teacher accounts are created by administrators. Please contact your admin for access.';
+      case 'franchise':
+        return 'Franchise accounts are created by administrators. Please contact support for access.';
+      case 'admin':
+        return 'Admin accounts are created by system administrators. Please contact support for access.';
+      default:
+        return '';
     }
   }
 
@@ -161,7 +221,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.school,
+                    getRoleIcon(),
                     color: ColorManager.primary,
                     size: 60,
                   ),
@@ -169,7 +229,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 32),
                 // Branding text
                 Text(
-                  'LUYIP EDUCATION',
+                  'LUIYP EDUCATION',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
@@ -240,7 +300,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.school,
+                    getRoleIcon(),
                     color: ColorManager.primary,
                     size: 40,
                   ),
@@ -248,7 +308,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 16),
                 // Branding text
                 Text(
-                  'LUYIP EDUCATION',
+                  'LUIYP EDUCATION',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -331,7 +391,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.school,
+                    getRoleIcon(),
                     color: ColorManager.primary,
                     size: 30,
                   ),
@@ -339,7 +399,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 12),
                 // Branding text
                 Text(
-                  'LUYIP EDUCATION',
+                  'LUIYP EDUCATION',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -398,28 +458,65 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         if (isSmallScreen) const SizedBox(height: 8),
 
-        // Login header
-        Text(
-          'Welcome Back',
-          style: TextStyle(
-            fontSize: isSmallScreen ? 24 : 30,
-            fontWeight: FontWeight.bold,
-            color: ColorManager.textDark,
-          ),
+        // Login header with role indicator
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Welcome Back',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 24 : 30,
+                      fontWeight: FontWeight.bold,
+                      color: ColorManager.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Please sign in to access your account',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 14 : 16,
+                      color: ColorManager.textMedium,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Role indicator badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: ColorManager.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: ColorManager.primary.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    getRoleIcon(),
+                    color: ColorManager.primary,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    getRoleDisplayName(),
+                    style: TextStyle(
+                      color: ColorManager.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Please sign in to access your account',
-          style: TextStyle(
-            fontSize: isSmallScreen ? 14 : 16,
-            color: ColorManager.textMedium,
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Role selection
-        _buildRoleSelector(isSmallScreen),
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
 
         // Login form
         Form(
@@ -434,59 +531,12 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 32),
               _buildLoginButton(),
               const SizedBox(height: 20),
-              _buildSignUpPrompt(),
+              // Conditional sign up prompt or info message
+              canSelfRegister() ? _buildSignUpPrompt() : _buildInfoMessage(),
             ],
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildRoleSelector(bool isSmallScreen) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Select Role',
-          style: TextStyle(
-            fontSize: isSmallScreen ? 14 : 16,
-            fontWeight: FontWeight.w600,
-            color: ColorManager.textDark,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            _buildRoleChip('Student', 'student'),
-            _buildRoleChip('Teacher', 'teacher'),
-            _buildRoleChip('Franchise', 'franchise'),
-            _buildRoleChip('Admin', 'admin'),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRoleChip(String label, String role) {
-    final isSelected = selectedRole == role;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) => setState(() => selectedRole = role),
-      labelStyle: TextStyle(
-        color: isSelected ? Colors.white : ColorManager.textDark,
-        fontWeight: FontWeight.w500,
-      ),
-      backgroundColor: Colors.white,
-      selectedColor: ColorManager.primary,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: isSelected ? ColorManager.primary : Colors.grey.shade300,
-        ),
-      ),
     );
   }
 
@@ -613,8 +663,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   strokeWidth: 2,
                 ),
               )
-            : const Text(
-                'Sign In',
+            : Text(
+                'Sign In as ${getRoleDisplayName()}',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -639,7 +689,9 @@ class _LoginScreenState extends State<LoginScreen> {
         TextButton(
           onPressed: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => SignUpScreen()),
+            MaterialPageRoute(
+              builder: (context) => SignUpScreen(userRole: selectedRole),
+            ),
           ),
           style: TextButton.styleFrom(
             foregroundColor: ColorManager.primary,
@@ -654,6 +706,39 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildInfoMessage() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: ColorManager.primary.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: ColorManager.primary.withOpacity(0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline,
+            color: ColorManager.primary,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              getRegistrationMessage(),
+              style: TextStyle(
+                fontSize: 13,
+                color: ColorManager.textMedium,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

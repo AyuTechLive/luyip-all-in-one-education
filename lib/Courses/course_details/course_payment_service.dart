@@ -14,6 +14,10 @@ class CoursePaymentService {
   final Function(bool) onEnrollmentStatusChanged;
   final Function(bool) onProcessingStatusChanged;
 
+  // Store current enrollment details for payment processing
+  String? _currentCourseName;
+  double? _currentAmount;
+
   CoursePaymentService({
     required this.context,
     required this.onEnrollmentStatusChanged,
@@ -89,6 +93,10 @@ class CoursePaymentService {
   void startPayment(double amount, String courseName) async {
     onProcessingStatusChanged(true);
 
+    // Store current enrollment details for payment success handler
+    _currentCourseName = courseName;
+    _currentAmount = amount;
+
     try {
       var options = {
         'key':
@@ -97,9 +105,15 @@ class CoursePaymentService {
             (amount * 100).toInt(), // Amount in smallest currency unit (paise)
         'name': 'LuYip Education',
         'description': 'Enrollment for $courseName',
+        // 'order_id': courseName, // Use course name as order ID for reference
         'prefill': {'email': _auth.currentUser?.email ?? ''},
         'external': {
           'wallets': ['paytm'],
+        },
+        'notes': {
+          'course_name': courseName,
+          'user_email': _auth.currentUser?.email ?? '',
+          'amount': amount.toString(),
         },
       };
 
@@ -119,12 +133,17 @@ class CoursePaymentService {
     onProcessingStatusChanged(false);
 
     try {
-      String courseName = response.orderId ?? "";
-      double amount =
-          double.tryParse(response.data?['amount'].toString() ?? "0") ?? 0;
-      amount = amount / 100; // Convert from paise to rupees
+      // Use stored values instead of trying to parse from response
+      String courseName = _currentCourseName ?? '';
+      double amount = _currentAmount ?? 0.0;
 
-      // Use the transaction service method
+      if (courseName.isEmpty || amount <= 0) {
+        throw Exception('Invalid payment data - course name or amount missing');
+      }
+
+      print('Processing payment for course: $courseName, amount: $amount');
+
+      // Use the transaction service method with correct parameters
       await _transactionService.completeEnrollment(
         transactionId: response.paymentId!,
         amount: amount,
@@ -142,7 +161,12 @@ class CoursePaymentService {
           backgroundColor: Colors.green,
         ),
       );
+
+      // Clear stored values
+      _currentCourseName = null;
+      _currentAmount = null;
     } catch (e) {
+      print('Error completing enrollment: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error completing enrollment: ${e.toString()}'),
@@ -154,6 +178,10 @@ class CoursePaymentService {
 
   void _handlePaymentError(PaymentFailureResponse response) {
     onProcessingStatusChanged(false);
+
+    // Clear stored values on error
+    _currentCourseName = null;
+    _currentAmount = null;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

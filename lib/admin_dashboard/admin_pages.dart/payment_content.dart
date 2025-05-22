@@ -108,11 +108,102 @@ class _PaymentsContentState extends State<PaymentsContent> {
     }
   }
 
-  String _formatDate(Timestamp? timestamp) {
-    if (timestamp == null) return 'N/A';
+  String _formatDateCompact(dynamic dateInput) {
+    if (dateInput == null) return 'N/A';
 
-    final DateTime dateTime = timestamp.toDate();
-    return DateFormat('dd MMM yyyy, h:mm a').format(dateTime);
+    try {
+      DateTime dateTime;
+
+      if (dateInput is Timestamp) {
+        dateTime = dateInput.toDate();
+      } else if (dateInput is String) {
+        // Handle different string date formats
+        if (dateInput.contains('-')) {
+          List<String> parts = dateInput.split('-');
+          if (parts.length == 3) {
+            int day, month, year;
+
+            if (parts[0].length == 4) {
+              // yyyy-mm-dd format
+              year = int.parse(parts[0]);
+              month = int.parse(parts[1]);
+              day = int.parse(parts[2]);
+            } else {
+              // dd-mm-yyyy format
+              day = int.parse(parts[0]);
+              month = int.parse(parts[1]);
+              year = int.parse(parts[2]);
+            }
+
+            dateTime = DateTime(year, month, day);
+          } else {
+            return dateInput;
+          }
+        } else {
+          dateTime = DateTime.parse(dateInput);
+        }
+      } else if (dateInput is DateTime) {
+        dateTime = dateInput;
+      } else {
+        return 'Invalid Date';
+      }
+
+      return DateFormat('dd MMM yy, HH:mm').format(dateTime);
+    } catch (e) {
+      print('Error formatting compact date: $e for input: $dateInput');
+      return dateInput is String ? dateInput : 'Invalid Date';
+    }
+  }
+
+  String _formatDate(dynamic dateInput) {
+    if (dateInput == null) return 'N/A';
+
+    try {
+      DateTime dateTime;
+
+      if (dateInput is Timestamp) {
+        dateTime = dateInput.toDate();
+      } else if (dateInput is String) {
+        // Handle different string date formats
+        if (dateInput.contains('-')) {
+          // Handle formats like "22-5-2025" or "2025-5-22"
+          List<String> parts = dateInput.split('-');
+          if (parts.length == 3) {
+            int day, month, year;
+
+            // Check if it's dd-mm-yyyy or yyyy-mm-dd format
+            if (parts[0].length == 4) {
+              // yyyy-mm-dd format
+              year = int.parse(parts[0]);
+              month = int.parse(parts[1]);
+              day = int.parse(parts[2]);
+            } else {
+              // dd-mm-yyyy format
+              day = int.parse(parts[0]);
+              month = int.parse(parts[1]);
+              year = int.parse(parts[2]);
+            }
+
+            dateTime = DateTime(year, month, day);
+          } else {
+            return dateInput; // Return as-is if can't parse
+          }
+        } else {
+          // Try to parse other string formats
+          dateTime = DateTime.parse(dateInput);
+        }
+      } else if (dateInput is DateTime) {
+        dateTime = dateInput;
+      } else {
+        return 'Invalid Date';
+      }
+
+      return DateFormat('dd MMM yyyy, h:mm a').format(dateTime);
+    } catch (e) {
+      print('Error formatting date: $e for input: $dateInput');
+      // Return the original string if it's a string, otherwise return error message
+      return dateInput is String ? dateInput : 'Invalid Date';
+    }
   }
 
   String _formatCurrency(double amount) {
@@ -159,142 +250,148 @@ class _PaymentsContentState extends State<PaymentsContent> {
 
   @override
   Widget build(BuildContext context) {
-    // Wrap everything in a Material widget to provide the Material design context
     return Material(
-        color: ColorManager.background,
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      color: ColorManager.background,
+      child: _isLoading
+          ? Center(
+              child: CircularProgressIndicator(
+                color: ColorManager.primary,
+              ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  // Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Payment Transactions',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: ColorManager.textDark,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Payment Transactions',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: ColorManager.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'View and manage all payment transactions',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: ColorManager.textMedium,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'View and manage all payment transactions',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: ColorManager.textMedium,
+                      ElevatedButton.icon(
+                        onPressed: _loadTransactions,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Refresh'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: ColorManager.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  ElevatedButton.icon(
-                    onPressed: _loadTransactions,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Refresh'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ColorManager.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-              // Revenue summary cards
-              Row(
-                children: [
-                  // Total Revenue
-                  Expanded(
-                    child: _buildSummaryCard(
-                      title: 'Total Revenue',
-                      amount: _totalRevenue,
-                      icon: Icons.monetization_on_outlined,
-                      color: ColorManager.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-
-                  // Course Revenue
-                  Expanded(
-                    child: _buildSummaryCard(
-                      title: 'Course Revenue',
-                      amount: _courseRevenue,
-                      icon: Icons.school_outlined,
-                      color: ColorManager.secondary,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-
-                  // Membership Revenue
-                  Expanded(
-                    child: _buildSummaryCard(
-                      title: 'Membership Revenue',
-                      amount: _membershipRevenue,
-                      icon: Icons.card_membership,
-                      color: ColorManager.success,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Filter controls
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      'Filter by:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: ColorManager.textDark,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-
-                    _buildFilterChip('All Transactions', 'all'),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('Course Enrollments', 'course'),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('Memberships', 'membership'),
-
-                    const Spacer(),
-
-                    // Search could be added here
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Transactions table
-              Expanded(
-                child: _isLoading
-                    ? Center(
-                        child: CircularProgressIndicator(
+                  // Revenue summary cards
+                  Row(
+                    children: [
+                      // Total Revenue
+                      Expanded(
+                        child: _buildSummaryCard(
+                          title: 'Total Revenue',
+                          amount: _totalRevenue,
+                          icon: Icons.monetization_on_outlined,
                           color: ColorManager.primary,
                         ),
-                      )
-                    : _transactions.isEmpty
-                        ? Center(
+                      ),
+                      const SizedBox(width: 16),
+
+                      // Course Revenue
+                      Expanded(
+                        child: _buildSummaryCard(
+                          title: 'Course Revenue',
+                          amount: _courseRevenue,
+                          icon: Icons.school_outlined,
+                          color: ColorManager.secondary,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+
+                      // Membership Revenue
+                      Expanded(
+                        child: _buildSummaryCard(
+                          title: 'Membership Revenue',
+                          amount: _membershipRevenue,
+                          icon: Icons.card_membership,
+                          color: ColorManager.success,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Filter controls
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Filter by:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: ColorManager.textDark,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        _buildFilterChip('All Transactions', 'all'),
+                        const SizedBox(width: 8),
+                        _buildFilterChip('Course Enrollments', 'course'),
+                        const SizedBox(width: 8),
+                        _buildFilterChip('Memberships', 'membership'),
+                        const Spacer(),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Transactions table
+                  _transactions.isEmpty
+                      ? Container(
+                          height: 400,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -313,12 +410,13 @@ class _PaymentsContentState extends State<PaymentsContent> {
                                 ),
                               ],
                             ),
-                          )
-                        : _buildTransactionsTable(),
+                          ),
+                        )
+                      : _buildTransactionsTable(),
+                ],
               ),
-            ],
-          ),
-        ));
+            ),
+    );
   }
 
   Widget _buildSummaryCard({
@@ -412,7 +510,7 @@ class _PaymentsContentState extends State<PaymentsContent> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -421,231 +519,267 @@ class _PaymentsContentState extends State<PaymentsContent> {
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Table header
+          // Table header - Fixed layout
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             decoration: BoxDecoration(
               color: ColorManager.light,
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(10),
-                topRight: Radius.circular(10),
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
               ),
             ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  Expanded(
-                    flex: 2,
+                  SizedBox(
+                    width: 120,
                     child: Text(
                       'Transaction ID',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: ColorManager.textDark,
+                        fontSize: 14,
                       ),
                     ),
                   ),
-                  Expanded(
-                    flex: 2,
+                  SizedBox(
+                    width: 200,
                     child: Text(
                       'User',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: ColorManager.textDark,
+                        fontSize: 14,
                       ),
                     ),
                   ),
-                  Expanded(
-                    flex: 2,
+                  SizedBox(
+                    width: 140,
                     child: Text(
                       'Type',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: ColorManager.textDark,
+                        fontSize: 14,
                       ),
                     ),
                   ),
-                  Expanded(
-                    flex: 2,
+                  SizedBox(
+                    width: 150,
                     child: Text(
                       'Details',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: ColorManager.textDark,
+                        fontSize: 14,
                       ),
                     ),
                   ),
-                  Expanded(
-                    flex: 1,
+                  SizedBox(
+                    width: 100,
                     child: Text(
                       'Amount',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: ColorManager.textDark,
+                        fontSize: 14,
                       ),
                     ),
                   ),
-                  Expanded(
-                    flex: 2,
+                  SizedBox(
+                    width: 160,
                     child: Text(
                       'Date',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: ColorManager.textDark,
+                        fontSize: 14,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 50), // Action column
+                  const SizedBox(width: 50),
                 ],
               ),
             ),
           ),
-          // Table body
-          Expanded(
-            child: ListView.separated(
-              itemCount: filteredTransactions.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final transaction = filteredTransactions[index];
-                final Color typeColor = _getColorForType(transaction['type']);
 
-                return Container(
+          // Table body - No separate scroll, uses main page scroll
+          ...filteredTransactions.asMap().entries.map((entry) {
+            final index = entry.key;
+            final transaction = entry.value;
+            final Color typeColor = _getColorForType(transaction['type']);
+
+            return Column(
+              children: [
+                if (index > 0) const Divider(height: 1),
+                Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
                     vertical: 16,
                   ),
-                  child: Row(
-                    children: [
-                      // Transaction ID
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          transaction['transactionId'],
-                          style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            color: ColorManager.textDark,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-
-                      // User
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          transaction['userEmail'],
-                          style: TextStyle(
-                            color: ColorManager.textMedium,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-
-                      // Type
-                      Expanded(
-                        flex: 2,
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: typeColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Icon(
-                                _getIconForType(transaction['type']),
-                                size: 16,
-                                color: typeColor,
-                              ),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        // Transaction ID
+                        SizedBox(
+                          width: 120,
+                          child: Text(
+                            transaction['transactionId'].toString().length > 12
+                                ? '${transaction['transactionId'].toString().substring(0, 12)}...'
+                                : transaction['transactionId'],
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: ColorManager.textDark,
+                              fontSize: 13,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _getDisplayNameForType(transaction['type']),
-                              style: TextStyle(
-                                color: ColorManager.textDark,
-                              ),
+                          ),
+                        ),
+
+                        // User
+                        SizedBox(
+                          width: 200,
+                          child: Text(
+                            transaction['userEmail'],
+                            style: TextStyle(
+                              color: ColorManager.textMedium,
+                              fontSize: 13,
                             ),
-                          ],
-                        ),
-                      ),
-
-                      // Details
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          transaction['type'] == 'course'
-                              ? transaction['courseName'] ?? 'N/A'
-                              : transaction['type'] == 'membership'
-                                  ? 'ID: ${transaction['membershipId'] ?? 'N/A'}'
-                                  : 'N/A',
-                          style: TextStyle(
-                            color: ColorManager.textMedium,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-
-                      // Amount
-                      Expanded(
-                        flex: 1,
-                        child: Text(
-                          _formatCurrency(transaction['amount']),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: ColorManager.success,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      ),
 
-                      // Date
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          _formatDate(transaction['timestamp']),
-                          style: TextStyle(
-                            color: ColorManager.textMedium,
+                        // Type
+                        SizedBox(
+                          width: 140,
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: typeColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Icon(
+                                  _getIconForType(transaction['type']),
+                                  size: 14,
+                                  color: typeColor,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  transaction['type'] == 'course'
+                                      ? 'Course'
+                                      : transaction['type'] == 'membership'
+                                          ? 'Member'
+                                          : 'Other',
+                                  style: TextStyle(
+                                    color: ColorManager.textDark,
+                                    fontSize: 13,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
 
-                      // Actions
-                      SizedBox(
-                        width: 50,
-                        child: IconButton(
-                          icon: Icon(
-                            Icons.more_vert,
-                            color: ColorManager.textLight,
+                        // Details
+                        SizedBox(
+                          width: 150,
+                          child: Text(
+                            transaction['type'] == 'course'
+                                ? transaction['courseName'] ?? 'N/A'
+                                : transaction['type'] == 'membership'
+                                    ? 'Membership Plan'
+                                    : 'N/A',
+                            style: TextStyle(
+                              color: ColorManager.textMedium,
+                              fontSize: 13,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          onPressed: () {
-                            _showTransactionDetails(transaction);
-                          },
                         ),
-                      ),
-                    ],
+
+                        // Amount
+                        SizedBox(
+                          width: 100,
+                          child: Text(
+                            _formatCurrency(transaction['amount']),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: ColorManager.success,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+
+                        // Date
+                        SizedBox(
+                          width: 160,
+                          child: Text(
+                            _formatDateCompact(transaction['timestamp']),
+                            style: TextStyle(
+                              color: ColorManager.textMedium,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+
+                        // Actions
+                        SizedBox(
+                          width: 50,
+                          child: IconButton(
+                            icon: Icon(
+                              Icons.visibility_outlined,
+                              color: ColorManager.primary,
+                              size: 18,
+                            ),
+                            onPressed: () {
+                              _showTransactionDetails(transaction);
+                            },
+                            tooltip: 'View Details',
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                );
-              },
-            ),
-          ),
+                ),
+              ],
+            );
+          }).toList(),
 
-          // Table footer with pagination (could be added)
+          // Table footer
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
               color: ColorManager.light,
               borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(10),
-                bottomRight: Radius.circular(10),
+                bottomLeft: Radius.circular(12),
+                bottomRight: Radius.circular(12),
               ),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   'Showing ${filteredTransactions.length} transactions',
                   style: TextStyle(
                     color: ColorManager.textMedium,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  'Total: ${_formatCurrency(_getFilteredTransactions().fold(0.0, (sum, tx) => sum + tx['amount']))}',
+                  style: TextStyle(
+                    color: ColorManager.textDark,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
                   ),
                 ),
               ],
@@ -659,70 +793,151 @@ class _PaymentsContentState extends State<PaymentsContent> {
   void _showTransactionDetails(Map<String, dynamic> transaction) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              _getIconForType(transaction['type']),
-              color: _getColorForType(transaction['type']),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Transaction Details',
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
         ),
-        content: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.8,
-          height: MediaQuery.of(context).size.height * 0.6,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildDetailRow('Transaction ID', transaction['transactionId']),
-                _buildDetailRow('User Email', transaction['userEmail']),
-                _buildDetailRow(
-                    'Amount', _formatCurrency(transaction['amount'])),
-                _buildDetailRow(
-                    'Type', _getDisplayNameForType(transaction['type'])),
-                _buildDetailRow('Date', _formatDate(transaction['timestamp'])),
-                _buildDetailRow('Status', transaction['status']),
-
-                // Type-specific details
-                if (transaction['type'] == 'course')
-                  _buildDetailRow('Course', transaction['courseName'] ?? 'N/A'),
-
-                if (transaction['type'] == 'membership') ...[
-                  _buildDetailRow(
-                      'Membership ID', transaction['membershipId'] ?? 'N/A'),
-                  if (transaction['startDate'] != null)
-                    _buildDetailRow(
-                        'Start Date', _formatDate(transaction['startDate'])),
-                  if (transaction['expiryDate'] != null)
-                    _buildDetailRow(
-                        'Expiry Date', _formatDate(transaction['expiryDate'])),
+        child: Container(
+          width: 500,
+          constraints: const BoxConstraints(maxHeight: 600),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _getColorForType(transaction['type'])
+                          .withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      _getIconForType(transaction['type']),
+                      color: _getColorForType(transaction['type']),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Transaction Details',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: ColorManager.textDark,
+                          ),
+                        ),
+                        Text(
+                          _getDisplayNameForType(transaction['type']),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: ColorManager.textMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
                 ],
-              ],
-            ),
+              ),
+              const SizedBox(height: 24),
+
+              // Content
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _buildDetailCard('Transaction ID',
+                          transaction['transactionId']?.toString() ?? 'N/A'),
+                      _buildDetailCard('User Email',
+                          transaction['userEmail']?.toString() ?? 'N/A'),
+                      _buildDetailCard('Amount',
+                          _formatCurrency(transaction['amount'] ?? 0.0)),
+                      _buildDetailCard(
+                          'Status', transaction['status']?.toString() ?? 'N/A'),
+                      _buildDetailCard(
+                          'Date & Time', _formatDate(transaction['timestamp'])),
+
+                      // Type-specific details
+                      if (transaction['type'] == 'course')
+                        _buildDetailCard('Course Name',
+                            transaction['courseName']?.toString() ?? 'N/A'),
+
+                      if (transaction['type'] == 'membership') ...[
+                        _buildDetailCard('Membership ID',
+                            transaction['membershipId']?.toString() ?? 'N/A'),
+                        if (transaction['startDate'] != null)
+                          _buildDetailCard('Start Date',
+                              _formatDate(transaction['startDate'])),
+                        if (transaction['expiryDate'] != null)
+                          _buildDetailCard('Expiry Date',
+                              _formatDate(transaction['expiryDate'])),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Actions
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(
+                      'Close',
+                      style: TextStyle(color: ColorManager.textMedium),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      // Add functionality to export or print transaction details
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Export functionality coming soon!'),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.download, size: 16),
+                    label: const Text('Export'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ColorManager.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+  Widget _buildDetailCard(String label, String value) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: ColorManager.light.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: ColorManager.light),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -730,18 +945,18 @@ class _PaymentsContentState extends State<PaymentsContent> {
             label,
             style: TextStyle(
               fontSize: 12,
+              fontWeight: FontWeight.w500,
               color: ColorManager.textMedium,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             value,
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
               color: ColorManager.textDark,
             ),
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

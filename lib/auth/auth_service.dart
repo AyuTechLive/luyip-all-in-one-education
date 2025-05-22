@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:luyip_website_edu/auth/loginscreen.dart';
 import 'package:luyip_website_edu/helpers/utils.dart';
+import 'package:luyip_website_edu/main.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -36,7 +37,7 @@ class AuthService {
       if (context.mounted) {
         Navigator.of(context).pop(); // Close loading dialog
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          MaterialPageRoute(builder: (context) => const EducationApp()),
           (route) => false,
         );
       }

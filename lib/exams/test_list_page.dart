@@ -1,7 +1,11 @@
+// Updates to TestListPage to add edit/delete options for tests
+
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:luyip_website_edu/exams/edit/edit_test_page.dart';
+
 import 'package:luyip_website_edu/exams/test_evaluation_page.dart';
 import 'package:luyip_website_edu/exams/test_model.dart';
 import 'package:luyip_website_edu/exams/test_result_page.dart';
@@ -323,6 +327,105 @@ class _TestListPageState extends State<TestListPage> {
     }
   }
 
+  // Navigate to the edit test page
+  void _navigateToEditTest(Map<String, dynamic> test) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditTestPage(
+          courseId: widget.courseName,
+          subjectId: widget.subjectName,
+          testId: test['id'],
+        ),
+      ),
+    ).then((_) {
+      // Refresh the list when returning from edit page
+      setState(() {
+        _testsFuture = _fetchTests();
+      });
+    });
+  }
+
+  // Delete test function
+  Future<void> _deleteTest(Map<String, dynamic> test) async {
+    final testId = test['id'];
+
+    // Check if test has submissions first
+    final submissionsSnapshot = await FirebaseDatabase.instance
+        .ref('TestSubmissions')
+        .child(testId)
+        .once();
+
+    bool hasSubmissions = submissionsSnapshot.snapshot.value != null;
+
+    // Show appropriate confirmation dialog
+    bool confirmDelete = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Confirm Delete'),
+            content: hasSubmissions
+                ? const Text(
+                    'This test has student submissions. Deleting it will permanently remove all submission data. This action cannot be undone.',
+                    style: TextStyle(color: Colors.red),
+                  )
+                : const Text(
+                    'Are you sure you want to delete this test? This action cannot be undone.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Delete test from the database
+      await FirebaseDatabase.instance
+          .ref(widget.courseName)
+          .child('SUBJECTS')
+          .child(widget.subjectName)
+          .child('Tests')
+          .child(testId)
+          .remove();
+
+      // Delete test submissions if they exist
+      if (hasSubmissions) {
+        await FirebaseDatabase.instance
+            .ref('TestSubmissions')
+            .child(testId)
+            .remove();
+      }
+
+      Utils().toastMessage('Test deleted successfully');
+
+      // Refresh the test list
+      setState(() {
+        _testsFuture = _fetchTests();
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      Utils().toastMessage('Error deleting test: ${e.toString()}');
+    }
+  }
+
   void _showSubmissionsDialog(Map<String, dynamic> test) async {
     showDialog(
       context: context,
@@ -440,7 +543,7 @@ class _TestListPageState extends State<TestListPage> {
       backgroundColor: ColorManager.background,
       appBar: AppBar(
         title: Text(
-          'TestsSSSSSS',
+          'Tests',
           style: TextStyle(
             color: ColorManager.textDark,
             fontWeight: FontWeight.bold,
@@ -537,6 +640,8 @@ class _TestListPageState extends State<TestListPage> {
                       final createdAt =
                           DateTime.fromMillisecondsSinceEpoch(createdAtMillis);
                       final status = testSubmissionStatus[testId] ?? '';
+                      final isAdmin = widget.userRole == 'admin' ||
+                          widget.userRole == 'teacher';
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 16),
@@ -587,6 +692,32 @@ class _TestListPageState extends State<TestListPage> {
                                                 ? Colors.green
                                                 : Colors.orange,
                                             fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    if (isAdmin && test['isActive'] != null)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: test['isActive'] == true
+                                              ? Colors.green.withOpacity(0.1)
+                                              : Colors.red.withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          test['isActive'] == true
+                                              ? 'Active'
+                                              : 'Inactive',
+                                          style: TextStyle(
+                                            color: test['isActive'] == true
+                                                ? Colors.green
+                                                : Colors.red,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
                                           ),
                                         ),
                                       ),
@@ -670,7 +801,29 @@ class _TestListPageState extends State<TestListPage> {
                                       ),
                                     ),
 
-                                    // Add View Results button for completed tests
+                                    // Add admin buttons for edit/delete
+                                    if (isAdmin)
+                                      Row(
+                                        children: [
+                                          // Edit button
+                                          IconButton(
+                                            icon: const Icon(Icons.edit,
+                                                color: Colors.blue),
+                                            onPressed: () =>
+                                                _navigateToEditTest(test),
+                                            tooltip: 'Edit Test',
+                                          ),
+                                          // Delete button
+                                          IconButton(
+                                            icon: const Icon(Icons.delete,
+                                                color: Colors.red),
+                                            onPressed: () => _deleteTest(test),
+                                            tooltip: 'Delete Test',
+                                          ),
+                                        ],
+                                      ),
+
+                                    // Student results button
                                     if (status == 'Completed')
                                       ElevatedButton.icon(
                                         style: ElevatedButton.styleFrom(

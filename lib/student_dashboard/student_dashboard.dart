@@ -8,6 +8,7 @@ import 'package:luyip_website_edu/Membership/membership_service.dart';
 import 'package:luyip_website_edu/certificate/student_certificate_page.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
 import 'package:luyip_website_edu/student_dashboard/dashboard_controller.dart';
+import 'package:luyip_website_edu/student_dashboard/internship.dart';
 import 'package:luyip_website_edu/student_dashboard/membership_card.dart';
 import 'package:luyip_website_edu/student_dashboard/sidebar_student.dart';
 
@@ -56,8 +57,8 @@ class _StudentDashboardContainerState extends State<StudentDashboardContainer> {
         return const StudentDashboardContent();
       case 'Library':
         return const StudentDashboardContent();
-      case 'Messages':
-        return const StudentDashboardContent();
+      case 'Internship':
+        return const StudentInternshipPage();
       case 'Settings':
         return const StudentDashboardContent();
       default:
@@ -119,8 +120,9 @@ class _StudentDashboardContainerState extends State<StudentDashboardContainer> {
         title: Text(
           isSmallScreen
               ? _currentPage // Show just page name on mobile
-              : 'Luyip Student Portal - $_currentPage',
-          style: const TextStyle(fontWeight: FontWeight.w600),
+              : 'Luiyp Student Portal - $_currentPage',
+          style:
+              const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
         ),
         backgroundColor: ColorManager.primary,
         actions: [
