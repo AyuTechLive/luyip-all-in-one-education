@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io';
 import 'package:luyip_website_edu/helpers/colors.dart';
 import 'package:luyip_website_edu/helpers/utils.dart';
 
@@ -24,12 +28,17 @@ class _AddVideoPageState extends State<AddVideoPage>
   final _subtitleController = TextEditingController();
   final _videoUrlController = TextEditingController();
   bool _isLoading = false;
+  bool _isUploading = false;
   List<String> subjects = [];
   String? _selectedSubject;
   int _lectureNumber = 1;
   late AnimationController _animationController;
   late Animation<double> _slideAnimation;
   late Animation<double> _fadeAnimation;
+
+  // Video upload variables
+  PlatformFile? _selectedVideoFile;
+  double _uploadProgress = 0.0;
 
   @override
   void initState() {
@@ -82,13 +91,13 @@ class _AddVideoPageState extends State<AddVideoPage>
   }
 
   Future<void> _fetchNextLectureNumber() async {
-    if (widget.subjectName.isEmpty) return;
+    if (_selectedSubject == null || _selectedSubject!.isEmpty) return;
 
     try {
       final videosRef = FirebaseDatabase.instance
           .ref(widget.courseName)
           .child('SUBJECTS')
-          .child(widget.subjectName)
+          .child(_selectedSubject!)
           .child('Videos');
 
       DatabaseEvent videosEvent = await videosRef.once();
@@ -117,6 +126,94 @@ class _AddVideoPageState extends State<AddVideoPage>
       }
     } catch (e) {
       Utils().toastMessage('Error fetching lecture number: ${e.toString()}');
+    }
+  }
+
+  Future<void> _pickAndUploadVideo() async {
+    try {
+      // Pick video file
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv'],
+        allowMultiple: false,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        // Check file size (limit to 1GB for web)
+        if (file.size > 1024 * 1024 * 1024) {
+          Utils().toastMessage('Video file size should be less than 1GB');
+          return;
+        }
+
+        setState(() {
+          _selectedVideoFile = file;
+          _isUploading = true;
+          _uploadProgress = 0.0;
+        });
+
+        // Upload immediately after selection
+        await _uploadVideoFile();
+      }
+    } catch (e) {
+      Utils().toastMessage('Error picking video file: ${e.toString()}');
+      setState(() {
+        _isUploading = false;
+      });
+    }
+  }
+
+  Future<void> _uploadVideoFile() async {
+    if (_selectedVideoFile == null) return;
+
+    try {
+      // Create a reference to Firebase Storage
+      final String fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${_selectedVideoFile!.name}';
+      final String storagePath =
+          'courses/${widget.courseName}/subjects/${_selectedSubject}/videos/$fileName';
+
+      final Reference storageRef =
+          FirebaseStorage.instance.ref().child(storagePath);
+
+      // Upload file
+      UploadTask uploadTask;
+      if (kIsWeb) {
+        uploadTask = storageRef.putData(
+          _selectedVideoFile!.bytes!,
+          SettableMetadata(
+              contentType: 'video/${_selectedVideoFile!.extension}'),
+        );
+      } else {
+        // For mobile
+        uploadTask = storageRef.putFile(File(_selectedVideoFile!.path!));
+      }
+
+      // Listen to upload progress
+      uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+        setState(() {
+          _uploadProgress = snapshot.bytesTransferred / snapshot.totalBytes;
+        });
+      });
+
+      // Wait for upload to complete
+      final TaskSnapshot snapshot = await uploadTask;
+      final String downloadUrl = await snapshot.ref.getDownloadURL();
+
+      // Set the URL in the controller automatically
+      setState(() {
+        _videoUrlController.text = downloadUrl;
+        _isUploading = false;
+        _uploadProgress = 0.0;
+      });
+
+      Utils().toastMessage('Video uploaded successfully!');
+    } catch (e) {
+      setState(() {
+        _isUploading = false;
+        _uploadProgress = 0.0;
+      });
+      Utils().toastMessage('Upload failed: ${e.toString()}');
     }
   }
 
@@ -163,6 +260,7 @@ class _AddVideoPageState extends State<AddVideoPage>
         'Title': _titleController.text,
         'Subtitle': _subtitleController.text,
         'Video Link': _videoUrlController.text,
+        'fileName': _selectedVideoFile?.name ?? '',
         'timestamp': ServerValue.timestamp,
       });
 
@@ -379,7 +477,7 @@ class _AddVideoPageState extends State<AddVideoPage>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Lecture #$_lectureNumber • ${widget.subjectName}',
+                      'Lecture #$_lectureNumber • ${_selectedSubject ?? widget.subjectName}',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.blue.shade600,
@@ -477,14 +575,21 @@ class _AddVideoPageState extends State<AddVideoPage>
               },
             ),
             const SizedBox(height: 20),
+
+            // Video Upload Section
+            _buildVideoUploadSection(),
+
+            const SizedBox(height: 20),
             _buildFormField(
               controller: _videoUrlController,
               label: 'Video URL',
-              hint: 'Enter the video link (YouTube, Vimeo, etc.)',
+              hint: 'Generated after video upload or enter external URL',
               icon: Icons.link,
+              readOnly: _selectedVideoFile != null &&
+                  _videoUrlController.text.isNotEmpty,
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter video URL';
+                  return 'Please upload a video file or enter a URL';
                 }
                 if (!Uri.parse(value).isAbsolute) {
                   return 'Please enter a valid URL';
@@ -497,6 +602,193 @@ class _AddVideoPageState extends State<AddVideoPage>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildVideoUploadSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Upload Video File',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.blue.shade800,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Column(
+            children: [
+              if (_selectedVideoFile != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.video_file, color: Colors.blue, size: 24),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _selectedVideoFile!.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Text(
+                                  '${(_selectedVideoFile!.size / 1024 / 1024).toStringAsFixed(2)} MB',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_videoUrlController.text.isNotEmpty &&
+                              !_isUploading)
+                            Icon(Icons.check_circle,
+                                color: Colors.green, size: 20),
+                          if (_isUploading)
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.blue,
+                              ),
+                            ),
+                        ],
+                      ),
+                      if (_isUploading) ...[
+                        const SizedBox(height: 12),
+                        Column(
+                          children: [
+                            LinearProgressIndicator(
+                              value: _uploadProgress,
+                              backgroundColor: Colors.grey.shade300,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.blue),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Uploading: ${(_uploadProgress * 100).toStringAsFixed(1)}%',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.blue.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _isUploading ? null : _pickAndUploadVideo,
+                  icon: _isUploading
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.video_call),
+                  label: Text(_isUploading
+                      ? 'Uploading Video...'
+                      : (_selectedVideoFile == null
+                          ? 'Select & Upload Video'
+                          : 'Change Video File')),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+              if (_videoUrlController.text.isNotEmpty && !_isUploading) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Video uploaded successfully! URL generated.',
+                          style: TextStyle(
+                            color: Colors.green.shade700,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (_selectedVideoFile == null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline,
+                          color: Colors.grey.shade600, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Supported formats: MP4, MOV, AVI, MKV, WEBM, FLV (Max: 1GB)',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -709,6 +1001,7 @@ class _AddVideoPageState extends State<AddVideoPage>
     required String hint,
     required IconData icon,
     int maxLines = 1,
+    bool readOnly = false,
     String? Function(String?)? validator,
   }) {
     return Column(
@@ -726,6 +1019,7 @@ class _AddVideoPageState extends State<AddVideoPage>
         TextFormField(
           controller: controller,
           maxLines: maxLines,
+          readOnly: readOnly,
           validator: validator,
           decoration: InputDecoration(
             hintText: hint,
@@ -743,7 +1037,7 @@ class _AddVideoPageState extends State<AddVideoPage>
               borderSide: BorderSide(color: Colors.blue, width: 2),
             ),
             filled: true,
-            fillColor: Colors.grey.shade50,
+            fillColor: readOnly ? Colors.grey.shade100 : Colors.grey.shade50,
           ),
         ),
       ],
@@ -755,7 +1049,7 @@ class _AddVideoPageState extends State<AddVideoPage>
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
-        onPressed: _isLoading ? null : _saveVideo,
+        onPressed: (_isLoading || _isUploading) ? null : _saveVideo,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.blue,
           foregroundColor: Colors.white,
@@ -764,8 +1058,8 @@ class _AddVideoPageState extends State<AddVideoPage>
           ),
           elevation: 4,
         ),
-        child: _isLoading
-            ? const Row(
+        child: (_isLoading || _isUploading)
+            ? Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SizedBox(
@@ -776,8 +1070,8 @@ class _AddVideoPageState extends State<AddVideoPage>
                       strokeWidth: 2,
                     ),
                   ),
-                  SizedBox(width: 16),
-                  Text('Saving Video...'),
+                  const SizedBox(width: 16),
+                  Text(_isLoading ? 'Saving Video...' : 'Uploading...'),
                 ],
               )
             : const Row(

@@ -12,6 +12,7 @@ import 'package:luyip_website_edu/firebase_options.dart';
 import 'package:luyip_website_edu/franchise_dahsboard/franchise_dashboard.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
 import 'package:luyip_website_edu/helpers/coming_soon.dart';
+import 'package:luyip_website_edu/helpers/video_helper.dart';
 import 'package:luyip_website_edu/home/admin_dashboard.dart';
 
 import 'package:luyip_website_edu/home/student_dashboard.dart';
@@ -26,6 +27,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const EducationApp());
+  if (kIsWeb) {
+    initializeSecurePlayer();
+  }
 }
 
 class EducationApp extends StatelessWidget {

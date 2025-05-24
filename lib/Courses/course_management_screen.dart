@@ -1,4 +1,9 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:image_network/image_network.dart';
@@ -942,74 +947,139 @@ class _CourseContentManagementState extends State<CourseContentManagement>
   }
 
   Widget _buildTestsTab() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.orange.withOpacity(0.1),
-                    Colors.orange.withOpacity(0.05),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(
-                Icons.quiz,
-                size: 60,
-                color: Colors.orange,
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth > 800;
+        final isTablet =
+            constraints.maxWidth > 600 && constraints.maxWidth <= 800;
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(isDesktop ? 32 : 16),
+          child: Container(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight - (isDesktop ? 64 : 32),
             ),
-            const SizedBox(height: 24),
-            Text(
-              'Test Management Hub',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: ColorManager.textDark,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Create and manage assessments for ${widget.courseName}',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: ColorManager.textMedium,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 40),
-            Row(
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _buildTestActionCard(
-                  'Create New Test',
-                  'Design fresh assessments',
-                  Icons.add_task,
-                  Colors.orange,
-                  _navigateToAddTests,
+                // Icon Section
+                Container(
+                  padding: EdgeInsets.all(isDesktop ? 32 : 24),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        const Color(0xFF1E88E5).withOpacity(0.1),
+                        const Color(0xFF1565C0).withOpacity(0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: const Color(0xFF1E88E5).withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.quiz,
+                    size: isDesktop ? 72 : 56,
+                    color: const Color(0xFF1E88E5),
+                  ),
                 ),
-                const SizedBox(width: 20),
-                _buildTestActionCard(
-                  'Manage Tests',
-                  'Edit existing assessments',
-                  Icons.edit_note,
-                  ColorManager.primary,
-                  _navigateToTestList,
+
+                SizedBox(height: isDesktop ? 32 : 24),
+
+                // Title
+                Text(
+                  'Test Management Hub',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isDesktop ? 28 : 22,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF1565C0),
+                  ),
                 ),
+
+                SizedBox(height: isDesktop ? 16 : 12),
+
+                // Subtitle
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isDesktop ? 40 : 20,
+                  ),
+                  child: Text(
+                    'Create and manage assessments for ${widget.courseName}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: isDesktop ? 18 : 16,
+                      color: const Color(0xFF1E88E5).withOpacity(0.8),
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: isDesktop ? 48 : 32),
+
+                // Action Cards
+                Container(
+                  constraints: BoxConstraints(
+                    maxWidth: isDesktop ? 800 : double.infinity,
+                  ),
+                  child: isDesktop || isTablet
+                      ? Row(
+                          children: [
+                            Expanded(
+                              child: _buildTestActionCard(
+                                'Create New Test',
+                                'Design fresh assessments',
+                                Icons.add_task,
+                                const Color(0xFF1E88E5),
+                                _navigateToAddTests,
+                                isDesktop,
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            Expanded(
+                              child: _buildTestActionCard(
+                                'Manage Tests',
+                                'Edit existing assessments',
+                                Icons.edit_note,
+                                const Color(0xFF1565C0),
+                                _navigateToTestList,
+                                isDesktop,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            _buildTestActionCard(
+                              'Create New Test',
+                              'Design fresh assessments',
+                              Icons.add_task,
+                              const Color(0xFF1E88E5),
+                              _navigateToAddTests,
+                              isDesktop,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildTestActionCard(
+                              'Manage Tests',
+                              'Edit existing assessments',
+                              Icons.edit_note,
+                              const Color(0xFF1565C0),
+                              _navigateToTestList,
+                              isDesktop,
+                            ),
+                          ],
+                        ),
+                ),
+
+                SizedBox(height: isDesktop ? 40 : 24),
               ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -1019,54 +1089,72 @@ class _CourseContentManagementState extends State<CourseContentManagement>
     IconData icon,
     Color color,
     VoidCallback onTap,
+    bool isDesktop,
   ) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: color.withOpacity(0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
+    return Container(
+      width: double.infinity,
+      constraints: BoxConstraints(
+        minHeight: isDesktop ? 180 : 140,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: EdgeInsets.all(isDesktop ? 32 : 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: color.withOpacity(0.2),
+                width: 1,
               ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
                   color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
                 ),
-                child: Icon(icon, color: color, size: 32),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: ColorManager.textDark,
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(isDesktop ? 16 : 12),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: isDesktop ? 32 : 28,
+                    color: color,
+                  ),
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: ColorManager.textMedium,
+                SizedBox(height: isDesktop ? 20 : 16),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isDesktop ? 18 : 16,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF1565C0),
+                  ),
                 ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+                SizedBox(height: isDesktop ? 8 : 6),
+                Text(
+                  subtitle,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isDesktop ? 14 : 13,
+                    color: color.withOpacity(0.8),
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1611,8 +1699,12 @@ class _AddDocumentPageState extends State<AddDocumentPage> {
   final _descriptionController = TextEditingController();
   final _urlController = TextEditingController();
   bool _isLoading = false;
+  bool _isUploading = false;
   List<String> subjects = [];
   String? _selectedSubject;
+
+  // File upload variables
+  PlatformFile? _selectedFile;
 
   @override
   void initState() {
@@ -1647,6 +1739,73 @@ class _AddDocumentPageState extends State<AddDocumentPage> {
       }
     } catch (e) {
       Utils().toastMessage('Error fetching subjects: ${e.toString()}');
+    }
+  }
+
+  Future<void> _pickAndUploadPdf() async {
+    try {
+      // Pick PDF file
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+        allowMultiple: false,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        setState(() {
+          _selectedFile = result.files.first;
+          _isUploading = true;
+        });
+
+        // Upload immediately after selection
+        await _uploadPdfFile();
+      }
+    } catch (e) {
+      Utils().toastMessage('Error picking file: ${e.toString()}');
+      setState(() {
+        _isUploading = false;
+      });
+    }
+  }
+
+  Future<void> _uploadPdfFile() async {
+    if (_selectedFile == null) return;
+
+    try {
+      // Create a reference to Firebase Storage
+      final String fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${_selectedFile!.name}';
+      final String storagePath =
+          'courses/${widget.courseName}/subjects/${_selectedSubject}/${widget.documentType}/$fileName';
+
+      final Reference storageRef =
+          FirebaseStorage.instance.ref().child(storagePath);
+
+      // Upload file
+      UploadTask uploadTask;
+      if (kIsWeb) {
+        uploadTask = storageRef.putData(_selectedFile!.bytes!);
+      } else {
+        // For mobile (though you mentioned it's web)
+        uploadTask = storageRef.putFile(File(_selectedFile!.path!));
+      }
+
+      // Wait for upload to complete
+      final TaskSnapshot snapshot = await uploadTask;
+      final String downloadUrl = await snapshot.ref.getDownloadURL();
+
+      // Set the URL in the controller automatically
+      setState(() {
+        _urlController.text = downloadUrl;
+        _isUploading = false;
+      });
+
+      Utils().toastMessage('PDF uploaded successfully!');
+    } catch (e) {
+      setState(() {
+        _isUploading = false;
+      });
+      Utils().toastMessage('Upload failed: ${e.toString()}');
     }
   }
 
@@ -1696,6 +1855,7 @@ class _AddDocumentPageState extends State<AddDocumentPage> {
         'description': _descriptionController.text,
         'url': _urlController.text,
         'type': widget.documentType,
+        'fileName': _selectedFile?.name ?? '',
         'timestamp': ServerValue.timestamp,
       });
 
@@ -1710,6 +1870,7 @@ class _AddDocumentPageState extends State<AddDocumentPage> {
             'url': _urlController.text,
             'type': widget.documentType,
             'subject': _selectedSubject,
+            'fileName': _selectedFile?.name ?? '',
           }
         ]),
       });
@@ -1833,17 +1994,20 @@ class _AddDocumentPageState extends State<AddDocumentPage> {
                           },
                         ),
                         const SizedBox(height: 20),
+
+                        // PDF Upload Section
+                        _buildPdfUploadSection(),
+
+                        const SizedBox(height: 20),
                         _buildFormField(
                           controller: _urlController,
                           label: 'Document URL',
-                          hint: 'Enter the document link',
+                          hint: 'Generated after PDF upload',
                           icon: Icons.link,
+                          readOnly: true,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please enter document URL';
-                            }
-                            if (!Uri.parse(value).isAbsolute) {
-                              return 'Please enter a valid URL';
+                              return 'Please upload a PDF file to generate URL';
                             }
                             return null;
                           },
@@ -1856,6 +2020,141 @@ class _AddDocumentPageState extends State<AddDocumentPage> {
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildPdfUploadSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Upload PDF File',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: ColorManager.textDark,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Column(
+            children: [
+              if (_selectedFile != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.picture_as_pdf, color: Colors.red, size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _selectedFile!.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              '${(_selectedFile!.size / 1024 / 1024).toStringAsFixed(2)} MB',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_urlController.text.isNotEmpty && !_isUploading)
+                        Icon(Icons.check_circle, color: Colors.green, size: 20),
+                      if (_isUploading)
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: ColorManager.primary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _isUploading ? null : _pickAndUploadPdf,
+                  icon: _isUploading
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.file_upload),
+                  label: Text(_isUploading
+                      ? 'Uploading...'
+                      : (_selectedFile == null
+                          ? 'Select & Upload PDF'
+                          : 'Change PDF File')),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: widget.documentType == 'notes'
+                        ? Colors.green
+                        : Colors.purple,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+              if (_urlController.text.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'PDF uploaded successfully! URL generated.',
+                          style: TextStyle(
+                            color: Colors.green.shade700,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1913,6 +2212,7 @@ class _AddDocumentPageState extends State<AddDocumentPage> {
     required String hint,
     required IconData icon,
     int maxLines = 1,
+    bool readOnly = false,
     String? Function(String?)? validator,
   }) {
     return Column(
@@ -1930,6 +2230,7 @@ class _AddDocumentPageState extends State<AddDocumentPage> {
         TextFormField(
           controller: controller,
           maxLines: maxLines,
+          readOnly: readOnly,
           validator: validator,
           decoration: InputDecoration(
             hintText: hint,
@@ -1947,7 +2248,7 @@ class _AddDocumentPageState extends State<AddDocumentPage> {
               borderSide: BorderSide(color: ColorManager.primary, width: 2),
             ),
             filled: true,
-            fillColor: Colors.grey.shade50,
+            fillColor: readOnly ? Colors.grey.shade100 : Colors.grey.shade50,
           ),
         ),
       ],

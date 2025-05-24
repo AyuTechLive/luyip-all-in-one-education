@@ -172,14 +172,6 @@ class _MembershipScreenState extends State<MembershipScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ColorManager.background,
-      appBar: AppBar(
-        backgroundColor: ColorManager.primary,
-        title: const Text(
-          'Membership',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        elevation: 0,
-      ),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: ColorManager.primary),

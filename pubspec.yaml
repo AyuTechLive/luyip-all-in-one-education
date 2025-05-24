@@ -57,6 +57,8 @@ dependencies:
   printing: ^5.14.2
   chewie: ^1.11.3
   ivlivs_pdf_viewer: ^0.1.0
+  youtube_player_flutter: ^9.1.1
+ 
   
 
 dev_dependencies:

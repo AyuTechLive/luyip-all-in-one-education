@@ -90,15 +90,15 @@ class _StudentDashboardContainerState extends State<StudentDashboardContainer> {
     setState(() {
       _currentPage = pageName;
       _currentContent = _getContentForPage(pageName);
-
-      // For mobile, close drawer when page changes
-      if (_isSmallScreen(context)) {
-        // Close drawer if open
-        if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
-          Navigator.of(context).pop();
-        }
-      }
     });
+
+    // For mobile, close drawer when page changes - but be more careful
+    if (_isSmallScreen(context)) {
+      // Only close drawer if it's actually open
+      if (_scaffoldKey.currentState?.isDrawerOpen == true) {
+        Navigator.of(context).pop();
+      }
+    }
   }
 
   @override
@@ -657,7 +657,7 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
 
   Widget _buildQuickActionsRow(bool isSmallScreen) {
     if (isSmallScreen) {
-      // Mobile layout - grid with 2 items per row
+      // Mobile layout - grid with 2 items per row (FIXED VERSION)
       return GridView.count(
         crossAxisCount: 2,
         shrinkWrap: true,
@@ -666,7 +666,7 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
         crossAxisSpacing: 12,
         childAspectRatio: 1.5,
         children: [
-          _buildQuickActionButton(
+          _buildQuickActionButtonMobile(
             'Continue Learning',
             Icons.play_circle_outline,
             ColorManager.primary,
@@ -680,7 +680,7 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
               );
             },
           ),
-          _buildQuickActionButton(
+          _buildQuickActionButtonMobile(
             'View Assignments',
             Icons.assignment_outlined,
             ColorManager.warning,
@@ -694,7 +694,7 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
               );
             },
           ),
-          _buildQuickActionButton(
+          _buildQuickActionButtonMobile(
             'Join Live Class',
             Icons.videocam_outlined,
             ColorManager.error,
@@ -708,7 +708,7 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
               );
             },
           ),
-          _buildQuickActionButton(
+          _buildQuickActionButtonMobile(
             'View Schedule',
             Icons.calendar_today_outlined,
             ColorManager.info,
@@ -775,6 +775,101 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
         ],
       );
     }
+  }
+
+  Widget _buildQuickActionButtonMobile(
+      String label, IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: ColorManager.dark.withOpacity(0.05),
+              spreadRadius: 1,
+              blurRadius: 5,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: ColorManager.textDark,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+// UPDATED: Modify the existing desktop version to remove Expanded dependency
+  Widget _buildQuickActionButton(
+      String label, IconData icon, Color color, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: ColorManager.dark.withOpacity(0.05),
+                spreadRadius: 1,
+                blurRadius: 5,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: ColorManager.textDark,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildEnrolledCoursesSection(
@@ -1327,54 +1422,6 @@ class _StudentDashboardContentState extends State<StudentDashboardContent> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionButton(
-      String label, IconData icon, Color color, VoidCallback onTap) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: ColorManager.dark.withOpacity(0.05),
-                spreadRadius: 1,
-                blurRadius: 5,
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: ColorManager.textDark,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 13,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

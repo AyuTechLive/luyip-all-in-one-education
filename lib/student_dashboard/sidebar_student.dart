@@ -511,6 +511,8 @@ class _StudentSidebarState extends State<StudentSidebar> {
     );
   }
 
+  // In StudentSidebar class, replace the _buildSidebarItem method with this fixed version:
+
   Widget _buildSidebarItem(
     BuildContext context,
     IconData icon,
@@ -521,10 +523,15 @@ class _StudentSidebarState extends State<StudentSidebar> {
   }) {
     return GestureDetector(
       onTap: () {
-        // Use the callback to change the page
+        // First change the page
         widget.onPageChanged(label);
-        if (widget.isMobile && Navigator.canPop(context)) {
-          Navigator.pop(context);
+
+        // Then handle mobile drawer closing
+        if (widget.isMobile) {
+          // Check if we're in a drawer and close it
+          if (Scaffold.of(context).isDrawerOpen) {
+            Navigator.of(context).pop(); // Only pop the drawer
+          }
         }
       },
       child: Container(
