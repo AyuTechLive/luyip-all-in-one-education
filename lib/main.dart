@@ -12,6 +12,7 @@ import 'package:luyip_website_edu/firebase_options.dart';
 import 'package:luyip_website_edu/franchise_dahsboard/franchise_dashboard.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
 import 'package:luyip_website_edu/helpers/coming_soon.dart';
+import 'package:luyip_website_edu/helpers/fevicon_helper.dart';
 import 'package:luyip_website_edu/helpers/video_helper.dart';
 import 'package:luyip_website_edu/home/admin_dashboard.dart';
 import 'package:luyip_website_edu/home/student_dashboard.dart';
@@ -36,7 +37,7 @@ class EducationApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Educational Platform',
+      title: 'Luiyp Education',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         fontFamily: 'Poppins',
@@ -65,11 +66,644 @@ class EducationApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AuthWrapper(),
+      // Add named routes for URL routing
+      routes: {
+        '/': (context) => const AuthWrapper(),
+        '/admin': (context) => const AdminRouteHandler(),
+        '/teacher': (context) => const TeacherRouteHandler(),
+        '/franchise': (context) => const FranchiseRouteHandler(),
+        '/student': (context) => const StudentRouteHandler(),
+      },
+      initialRoute: '/',
+      // Handle unknown routes
+      onUnknownRoute: (settings) {
+        return MaterialPageRoute(
+          builder: (context) => const AuthWrapper(),
+        );
+      },
     );
   }
 }
 
+// Route Handlers for different user types
+class AdminRouteHandler extends StatelessWidget {
+  const AdminRouteHandler({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<User?>(
+      future: _getCurrentUser(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingScreen();
+        }
+
+        final User? user = snapshot.data;
+
+        if (user == null) {
+          // User not logged in, show admin login
+          return const LoginScreen(userRole: 'admin');
+        }
+
+        // User is logged in, check if they're an admin
+        return FutureBuilder<bool>(
+          future: _checkUserRole(user.email!, 'admin'),
+          builder: (context, roleSnapshot) {
+            if (roleSnapshot.connectionState == ConnectionState.waiting) {
+              return _buildLoadingScreen();
+            }
+
+            if (roleSnapshot.data == true) {
+              // User is admin, show admin dashboard
+              return const AdminDashboardContainer();
+            } else {
+              // User is logged in but not admin, show access denied
+              return _buildAccessDeniedScreen(context, 'admin');
+            }
+          },
+        );
+      },
+    );
+  }
+
+  Future<User?> _getCurrentUser() async {
+    return FirebaseAuth.instance.currentUser;
+  }
+
+  Future<bool> _checkUserRole(String email, String role) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('Users')
+          .doc(role)
+          .collection('accounts')
+          .doc(email)
+          .get();
+      return doc.exists;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Widget _buildLoadingScreen() {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Use logo from websiteContent or fallback to assets
+            FutureBuilder<DocumentSnapshot>(
+              future: FirebaseFirestore.instance
+                  .collection('website_general')
+                  .doc('dashboard')
+                  .get(),
+              builder: (context, snapshot) {
+                String logoUrl = '';
+
+                if (snapshot.hasData && snapshot.data!.exists) {
+                  final data = snapshot.data!.data() as Map<String, dynamic>?;
+                  final websiteContent =
+                      data?['websiteContent'] as Map<String, dynamic>? ?? {};
+                  logoUrl = websiteContent['logoUrl']?.toString() ?? '';
+                }
+
+                return logoUrl.isNotEmpty
+                    ? Image.network(
+                        logoUrl,
+                        width: 120,
+                        height: 120,
+                      )
+                    : Container();
+              },
+            ),
+            const SizedBox(height: 24),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            const Text('Checking credentials...'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAccessDeniedScreen(BuildContext context, String requiredRole) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Access Denied'),
+        backgroundColor: Colors.red,
+        foregroundColor: Colors.white,
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.lock,
+                size: 80,
+                color: Colors.red,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Access Denied',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'You don\'t have permission to access the ${requiredRole} dashboard.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 30),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton(
+                    onPressed: () async {
+                      await FirebaseAuth.instance.signOut();
+                      Navigator.pushReplacementNamed(context, '/admin');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF5E4DCD),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Login as Admin'),
+                  ),
+                  const SizedBox(width: 16),
+                  OutlinedButton(
+                    onPressed: () {
+                      Navigator.pushReplacementNamed(context, '/');
+                    },
+                    child: const Text('Go to Home'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Similar route handlers for other user types
+class TeacherRouteHandler extends StatelessWidget {
+  const TeacherRouteHandler({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<User?>(
+      future: _getCurrentUser(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingScreen();
+        }
+
+        final User? user = snapshot.data;
+
+        if (user == null) {
+          return const LoginScreen(userRole: 'teacher');
+        }
+
+        return FutureBuilder<bool>(
+          future: _checkUserRole(user.email!, 'teacher'),
+          builder: (context, roleSnapshot) {
+            if (roleSnapshot.connectionState == ConnectionState.waiting) {
+              return _buildLoadingScreen();
+            }
+
+            if (roleSnapshot.data == true) {
+              return const TeacherDashboard();
+            } else {
+              return _buildAccessDeniedScreen(context, 'teacher');
+            }
+          },
+        );
+      },
+    );
+  }
+
+  Future<User?> _getCurrentUser() async {
+    return FirebaseAuth.instance.currentUser;
+  }
+
+  Future<bool> _checkUserRole(String email, String role) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('Users')
+          .doc(role)
+          .collection('accounts')
+          .doc(email)
+          .get();
+      return doc.exists;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Widget _buildLoadingScreen() {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Use logo from websiteContent or fallback to assets
+            FutureBuilder<DocumentSnapshot>(
+              future: FirebaseFirestore.instance
+                  .collection('website_general')
+                  .doc('dashboard')
+                  .get(),
+              builder: (context, snapshot) {
+                String logoUrl = '';
+
+                if (snapshot.hasData && snapshot.data!.exists) {
+                  final data = snapshot.data!.data() as Map<String, dynamic>?;
+                  final websiteContent =
+                      data?['websiteContent'] as Map<String, dynamic>? ?? {};
+                  logoUrl = websiteContent['logoUrl']?.toString() ?? '';
+                }
+
+                return logoUrl.isNotEmpty
+                    ? Image.network(
+                        logoUrl,
+                        width: 120,
+                        height: 120,
+                      )
+                    : Container();
+              },
+            ),
+            const SizedBox(height: 24),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            const Text('Checking credentials...'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAccessDeniedScreen(BuildContext context, String requiredRole) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Access Denied'),
+        backgroundColor: Colors.red,
+        foregroundColor: Colors.white,
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.lock,
+                size: 80,
+                color: Colors.red,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Access Denied',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'You don\'t have permission to access the ${requiredRole} dashboard.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 30),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton(
+                    onPressed: () async {
+                      await FirebaseAuth.instance.signOut();
+                      Navigator.pushReplacementNamed(context, '/teacher');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF5E4DCD),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Login as Teacher'),
+                  ),
+                  const SizedBox(width: 16),
+                  OutlinedButton(
+                    onPressed: () {
+                      Navigator.pushReplacementNamed(context, '/');
+                    },
+                    child: const Text('Go to Home'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class FranchiseRouteHandler extends StatelessWidget {
+  const FranchiseRouteHandler({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<User?>(
+      future: _getCurrentUser(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingScreen();
+        }
+
+        final User? user = snapshot.data;
+
+        if (user == null) {
+          return const LoginScreen(userRole: 'franchise');
+        }
+
+        return FutureBuilder<bool>(
+          future: _checkUserRole(user.email!, 'franchise'),
+          builder: (context, roleSnapshot) {
+            if (roleSnapshot.connectionState == ConnectionState.waiting) {
+              return _buildLoadingScreen();
+            }
+
+            if (roleSnapshot.data == true) {
+              return const FranchiseDashboard();
+            } else {
+              return _buildAccessDeniedScreen(context, 'franchise');
+            }
+          },
+        );
+      },
+    );
+  }
+
+  Future<User?> _getCurrentUser() async {
+    return FirebaseAuth.instance.currentUser;
+  }
+
+  Future<bool> _checkUserRole(String email, String role) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('Users')
+          .doc(role)
+          .collection('accounts')
+          .doc(email)
+          .get();
+      return doc.exists;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Widget _buildLoadingScreen() {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset('assets/images/logo.png', width: 120, height: 120),
+            const SizedBox(height: 24),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            const Text('Checking credentials...'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAccessDeniedScreen(BuildContext context, String requiredRole) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Access Denied'),
+        backgroundColor: Colors.red,
+        foregroundColor: Colors.white,
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.lock,
+                size: 80,
+                color: Colors.red,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Access Denied',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'You don\'t have permission to access the ${requiredRole} dashboard.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 30),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton(
+                    onPressed: () async {
+                      await FirebaseAuth.instance.signOut();
+                      Navigator.pushReplacementNamed(context, '/franchise');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF5E4DCD),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Login as Franchise'),
+                  ),
+                  const SizedBox(width: 16),
+                  OutlinedButton(
+                    onPressed: () {
+                      Navigator.pushReplacementNamed(context, '/');
+                    },
+                    child: const Text('Go to Home'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class StudentRouteHandler extends StatelessWidget {
+  const StudentRouteHandler({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<User?>(
+      future: _getCurrentUser(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingScreen();
+        }
+
+        final User? user = snapshot.data;
+
+        if (user == null) {
+          return const LoginScreen(userRole: 'student');
+        }
+
+        return FutureBuilder<bool>(
+          future: _checkUserRole(user.email!, 'student'),
+          builder: (context, roleSnapshot) {
+            if (roleSnapshot.connectionState == ConnectionState.waiting) {
+              return _buildLoadingScreen();
+            }
+
+            if (roleSnapshot.data == true) {
+              return const StudentDashboardContainer();
+            } else {
+              return _buildAccessDeniedScreen(context, 'student');
+            }
+          },
+        );
+      },
+    );
+  }
+
+  Future<User?> _getCurrentUser() async {
+    return FirebaseAuth.instance.currentUser;
+  }
+
+  Future<bool> _checkUserRole(String email, String role) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('Users')
+          .doc(role)
+          .collection('accounts')
+          .doc(email)
+          .get();
+      return doc.exists;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Widget _buildLoadingScreen() {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Use logo from websiteContent or fallback to assets
+            FutureBuilder<DocumentSnapshot>(
+              future: FirebaseFirestore.instance
+                  .collection('website_general')
+                  .doc('dashboard')
+                  .get(),
+              builder: (context, snapshot) {
+                String logoUrl = '';
+
+                if (snapshot.hasData && snapshot.data!.exists) {
+                  final data = snapshot.data!.data() as Map<String, dynamic>?;
+                  final websiteContent =
+                      data?['websiteContent'] as Map<String, dynamic>? ?? {};
+                  logoUrl = websiteContent['logoUrl']?.toString() ?? '';
+                }
+
+                return logoUrl.isNotEmpty
+                    ? Image.network(
+                        logoUrl,
+                        width: 120,
+                        height: 120,
+                      )
+                    : Container();
+              },
+            ),
+            const SizedBox(height: 24),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            const Text('Checking credentials...'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAccessDeniedScreen(BuildContext context, String requiredRole) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Access Denied'),
+        backgroundColor: Colors.red,
+        foregroundColor: Colors.white,
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.lock,
+                size: 80,
+                color: Colors.red,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Access Denied',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'You don\'t have permission to access the ${requiredRole} dashboard.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 30),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton(
+                    onPressed: () async {
+                      await FirebaseAuth.instance.signOut();
+                      Navigator.pushReplacementNamed(context, '/student');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF5E4DCD),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Login as Student'),
+                  ),
+                  const SizedBox(width: 16),
+                  OutlinedButton(
+                    onPressed: () {
+                      Navigator.pushReplacementNamed(context, '/');
+                    },
+                    child: const Text('Go to Home'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Keep the rest of your existing code exactly the same
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({Key? key}) : super(key: key);
 
@@ -91,6 +725,29 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Future<void> checkUserAuth() async {
     User? currentUser = _auth.currentUser;
+
+    // Also update favicon when checking auth
+    try {
+      final websiteDoc =
+          await _firestore.collection('website_general').doc('dashboard').get();
+
+      if (websiteDoc.exists) {
+        final data = websiteDoc.data() as Map<String, dynamic>;
+        final websiteContent =
+            Map<String, dynamic>.from(data['websiteContent'] ?? {});
+
+        final logoUrl = websiteContent['logoUrl']?.toString() ?? '';
+        final companyName =
+            websiteContent['companyName']?.toString() ?? 'Luiyp Education';
+
+        FaviconHelper.updateBranding(
+          logoUrl: logoUrl.isNotEmpty ? logoUrl : null,
+          title: companyName,
+        );
+      }
+    } catch (e) {
+      print('Error updating favicon in auth check: $e');
+    }
 
     if (currentUser != null) {
       try {
@@ -136,11 +793,43 @@ class _AuthWrapperState extends State<AuthWrapper> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Image.asset('assets/images/logo.png', width: 120, height: 120),
-              const SizedBox(height: 24),
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              const Text('Loading your educational journey...'),
+              FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance
+                    .collection('website_general')
+                    .doc('dashboard')
+                    .get(),
+                builder: (context, snapshot) {
+                  String logoUrl = '';
+
+                  String loadingText = 'Loading your educational journey...';
+
+                  if (snapshot.hasData && snapshot.data!.exists) {
+                    final data = snapshot.data!.data() as Map<String, dynamic>?;
+                    final websiteContent =
+                        data?['websiteContent'] as Map<String, dynamic>? ?? {};
+                    logoUrl = websiteContent['logoUrl']?.toString() ?? '';
+
+                    loadingText = websiteContent['loadingText']?.toString() ??
+                        'Loading your educational journey...';
+                  }
+
+                  return Column(
+                    children: [
+                      logoUrl.isNotEmpty
+                          ? Image.network(
+                              logoUrl,
+                              width: 120,
+                              height: 120,
+                            )
+                          : Container(),
+                      const SizedBox(height: 24),
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      Text(loadingText),
+                    ],
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -237,6 +926,17 @@ class _HomePageState extends State<HomePage> {
           websiteContent =
               Map<String, dynamic>.from(data['websiteContent'] ?? {});
         });
+
+        // Update favicon and page title when data is loaded
+        final logoUrl = websiteContent['logoUrl']?.toString() ?? '';
+        final companyName =
+            websiteContent['companyName']?.toString() ?? 'Luiyp Education';
+
+        // Update branding
+        FaviconHelper.updateBranding(
+          logoUrl: logoUrl.isNotEmpty ? logoUrl : null,
+          title: companyName,
+        );
 
         if (banners.isEmpty) _setDefaultBanners();
         if (websiteContent.isEmpty) _setDefaultWebsiteContent();
@@ -397,12 +1097,8 @@ class _HomePageState extends State<HomePage> {
                           _getWebsiteContent('logoUrl', ''),
                           width: 120,
                           height: 120,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Image.asset('assets/images/logo.png',
-                                  width: 120, height: 120),
                         )
-                      : Image.asset('assets/images/logo.png',
-                          width: 120, height: 120),
+                      : Container(),
                   const SizedBox(height: 24),
                   const CircularProgressIndicator(),
                   const SizedBox(height: 16),
@@ -504,6 +1200,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+// Update your NavBar class to use named routes
 class NavBar extends StatefulWidget {
   final bool isScrolled;
   final Map<String, dynamic> websiteContent;
@@ -511,7 +1208,7 @@ class NavBar extends StatefulWidget {
   const NavBar({
     Key? key,
     this.isScrolled = false,
-    required this.websiteContent, // ADD THIS PARAMETER
+    required this.websiteContent,
   }) : super(key: key);
 
   @override
@@ -520,6 +1217,7 @@ class NavBar extends StatefulWidget {
 
 class _NavBarState extends State<NavBar> {
   bool _showMenu = false;
+
   String _getWebsiteContent(String key, String defaultValue) {
     return widget.websiteContent[key]?.toString() ?? defaultValue;
   }
@@ -551,67 +1249,45 @@ class _NavBarState extends State<NavBar> {
           Row(
             children: [
               // Logo section
-              _getWebsiteContent('logoUrl', '').isNotEmpty
-                  ? Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Image.network(
-                        _getWebsiteContent('logoUrl', ''),
-                        width: 30,
-                        height: 30,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF5E4DCD),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            _getWebsiteContent('companyShortName', 'LE'),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
+              GestureDetector(
+                onTap: () {
+                  Navigator.pushNamed(context, '/');
+                },
+                child: Row(
+                  children: [
+                    _getWebsiteContent('logoUrl', '').isNotEmpty
+                        ? Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                          ),
-                        ),
-                      ),
-                    )
-                  : Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF5E4DCD),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _getWebsiteContent('companyShortName', 'LE'),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
+                            child: Image.network(
+                              _getWebsiteContent('logoUrl', ''),
+                              width: 30,
+                              height: 30,
+                            ),
+                          )
+                        : Container(),
+                    const SizedBox(width: 8),
+                    Text(
+                      _getWebsiteContent('companyName', 'Luiyp Education'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
                       ),
                     ),
-              const SizedBox(width: 8),
-              Text(
-                _getWebsiteContent('companyName', 'Luiyp Education'),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
+                  ],
                 ),
               ),
 
-              // Spacer to push menu items to center and login button to right
               const Spacer(),
 
               // Menu Items - Desktop only
               if (!isMobile) ...[
                 _buildNavigationItem('Home', () {
-                  // Stay on homepage
+                  Navigator.pushNamed(context, '/');
                 }),
                 _buildNavigationItem('Courses', () {
-                  // Navigate to courses screen
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -619,46 +1295,30 @@ class _NavBarState extends State<NavBar> {
                             AllCoursesScreen(userType: 'student')),
                   );
                 }),
-                _buildNavigationItem('Franchise', () {
-                  // Navigate to franchise info screen
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(
-                        userRole: 'franchise',
-                      ),
-                    ),
-                  );
-                }),
+
                 _buildNavigationItem('Teacher', () {
-                  // Navigate to teacher info screen
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(
-                        userRole: 'teacher',
-                      ),
-                    ),
-                  );
+                  // Use named route for teacher
+                  Navigator.pushNamed(context, '/teacher');
+                }),
+                _buildNavigationItem('Franchise', () {
+                  // Use named route for franchise
+                  Navigator.pushNamed(context, '/franchise');
                 }),
                 _buildNavigationItem('Verify Certificate', () {
-                  // Navigate to certificate verification screen
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) =>
-                            const ComingSoonScreen(pageName: 'Page not found')),
+                        builder: (context) => const ComingSoonScreen(
+                            pageName: 'Certificate Verification')),
                   );
                 }),
                 _buildNavigationItem('About Us', () {
-                  // Navigate to about screen
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                         content: Text('About Us section coming soon!')),
                   );
                 }),
                 _buildNavigationItem('Contact', () {
-                  // Navigate to contact screen
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                         content: Text('Contact information coming soon!')),
@@ -670,13 +1330,7 @@ class _NavBarState extends State<NavBar> {
                 // Login/Register Button - Desktop
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const LoginScreen(
-                                userRole: 'student',
-                              )),
-                    );
+                    Navigator.pushNamed(context, '/student');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF5E4DCD),
@@ -732,6 +1386,7 @@ class _NavBarState extends State<NavBar> {
                     setState(() {
                       _showMenu = false;
                     });
+                    Navigator.pushNamed(context, '/');
                   }),
                   _buildMobileMenuItem('Courses', Icons.school, () {
                     setState(() {
@@ -745,31 +1400,23 @@ class _NavBarState extends State<NavBar> {
                       ),
                     );
                   }),
-                  _buildMobileMenuItem('Franchise', Icons.business, () {
+                  _buildMobileMenuItem('Admin', Icons.admin_panel_settings, () {
                     setState(() {
                       _showMenu = false;
                     });
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginScreen(
-                          userRole: 'franchise',
-                        ),
-                      ),
-                    );
+                    Navigator.pushNamed(context, '/admin');
                   }),
                   _buildMobileMenuItem('Teacher', Icons.person_outline, () {
                     setState(() {
                       _showMenu = false;
                     });
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginScreen(
-                          userRole: 'teacher',
-                        ),
-                      ),
-                    );
+                    Navigator.pushNamed(context, '/teacher');
+                  }),
+                  _buildMobileMenuItem('Franchise', Icons.business, () {
+                    setState(() {
+                      _showMenu = false;
+                    });
+                    Navigator.pushNamed(context, '/franchise');
                   }),
                   _buildMobileMenuItem('Verify Certificate', Icons.verified,
                       () {
@@ -811,13 +1458,7 @@ class _NavBarState extends State<NavBar> {
                         setState(() {
                           _showMenu = false;
                         });
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const LoginScreen(
-                                    userRole: 'student',
-                                  )),
-                        );
+                        Navigator.pushNamed(context, '/student');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF5E4DCD),
@@ -3044,87 +3685,100 @@ class GetStartedSection extends StatelessWidget {
 
 class Footer extends StatelessWidget {
   final Map<String, dynamic> websiteContent;
+
   const Footer({
     Key? key,
-    required this.websiteContent, // ADD THIS
+    required this.websiteContent,
   }) : super(key: key);
 
-  // Navigation helper method
   String _getWebsiteContent(String key, String defaultValue) {
     return websiteContent[key]?.toString() ?? defaultValue;
   }
 
   void _navigateToPage(BuildContext context, String pageName) {
-    Widget targetPage;
+    Widget? targetPage;
+    String? routeName;
 
     switch (pageName) {
+      case 'Admin':
+        routeName = '/admin';
+        break;
+      case 'Teacher':
+        routeName = '/teacher';
+        break;
+      case 'Franchise':
+        routeName = '/franchise';
+        break;
+      case 'Student Login':
+        routeName = '/student';
+        break;
       case 'About Us':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'About Us');
         break;
       case 'Courses':
-        targetPage = const AllCoursesScreen(userType: 'Page not found');
+        targetPage = const AllCoursesScreen(userType: 'student');
         break;
       case 'Study Materials':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'Study Materials');
         break;
       case 'Test Series':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'Test Series');
         break;
       case 'Success Stories':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'Success Stories');
         break;
       case 'Blog':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
-        break;
-      case 'Admin':
-        targetPage = const LoginScreen(userRole: 'admin');
+        targetPage = const ComingSoonScreen(pageName: 'Blog');
         break;
       case 'NCERT Solutions':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'NCERT Solutions');
         break;
       case 'Sample Papers':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'Sample Papers');
         break;
       case 'Previous Year Papers':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'Previous Year Papers');
         break;
       case 'Scholarships':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'Scholarships');
         break;
       case 'Career Guidance':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'Career Guidance');
         break;
       case 'FAQ':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'FAQ');
         break;
       case 'Terms & Conditions':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'Terms & Conditions');
         break;
       case 'Privacy Policy':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'Privacy Policy');
         break;
       case 'Refund Policy':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'Refund Policy');
         break;
       case 'Cookie Policy':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'Cookie Policy');
         break;
       case 'Disclaimer':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'Disclaimer');
         break;
       case 'Contact Us':
-        targetPage = const ComingSoonScreen(pageName: 'Page not found');
+        targetPage = const ComingSoonScreen(pageName: 'Contact Us');
         break;
       default:
-        // For unhandled cases, show a coming soon screen
         targetPage = ComingSoonScreen(pageName: pageName);
         break;
     }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => targetPage),
-    );
+    if (routeName != null) {
+      Navigator.pushNamed(context, routeName);
+    } else if (targetPage != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => targetPage!),
+      );
+    }
   }
 
   @override
@@ -3156,7 +3810,7 @@ class Footer extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '© ${DateTime.now().year} Luiyp Education. All rights reserved.',
+                  '© ${DateTime.now().year} ${_getWebsiteContent('copyrightText', 'Luiyp Education. All rights reserved.')}',
                   style: TextStyle(
                     color: Colors.grey.shade400,
                   ),
@@ -3183,37 +3837,38 @@ class Footer extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF5E4DCD),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'LE',
-                      style: TextStyle(
-                        color: Colors.white,
+              GestureDetector(
+                onTap: () => Navigator.pushNamed(context, '/'),
+                child: Row(
+                  children: [
+                    _getWebsiteContent('logoUrl', '').isNotEmpty
+                        ? Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Image.network(
+                              _getWebsiteContent('logoUrl', ''),
+                              width: 40,
+                              height: 40,
+                            ))
+                        : Container(),
+                    const SizedBox(width: 8),
+                    Text(
+                      _getWebsiteContent('companyName', 'Luiyp Education'),
+                      style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
+                        color: Colors.white,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Luiyp Education',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
               Text(
-                'Luiyp Education is India\'s leading educational platform dedicated to providing affordable and quality education to students across the country.',
+                _getWebsiteContent('footerDescription',
+                    'Luiyp Education is India\'s leading educational platform dedicated to providing affordable and quality education to students across the country.'),
                 style: TextStyle(
                   color: Colors.grey.shade400,
                   height: 1.5,
@@ -3229,7 +3884,7 @@ class Footer extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'support@luiypedu.com',
+                    _getWebsiteContent('footerEmail', 'support@luiypedu.com'),
                     style: TextStyle(
                       color: Colors.grey.shade400,
                     ),
@@ -3246,7 +3901,7 @@ class Footer extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '+91 1234567890',
+                    _getWebsiteContent('footerPhone', '+91 1234567890'),
                     style: TextStyle(
                       color: Colors.grey.shade400,
                     ),
@@ -3281,6 +3936,8 @@ class Footer extends StatelessWidget {
               _buildFooterLink(context, 'Success Stories'),
               _buildFooterLink(context, 'Blog'),
               _buildFooterLink(context, 'Admin'),
+              _buildFooterLink(context, 'Teacher'),
+              _buildFooterLink(context, 'Franchise'),
             ],
           ),
         ),
@@ -3346,38 +4003,39 @@ class Footer extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Company info
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF5E4DCD),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'LE',
-                style: TextStyle(
-                  color: Colors.white,
+        // Company info with logo
+        GestureDetector(
+          onTap: () => Navigator.pushNamed(context, '/'),
+          child: Row(
+            children: [
+              _getWebsiteContent('logoUrl', '').isNotEmpty
+                  ? Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Image.network(
+                        _getWebsiteContent('logoUrl', ''),
+                        width: 40,
+                        height: 40,
+                      ))
+                  : Container(),
+              const SizedBox(width: 8),
+              Text(
+                _getWebsiteContent('companyName', 'Luiyp Education'),
+                style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
+                  color: Colors.white,
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              'Luiyp Education',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                color: Colors.white,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 16),
         Text(
-          'Luiyp Education is India\'s leading educational platform dedicated to providing affordable and quality education to students across the country.',
+          _getWebsiteContent('footerDescription',
+              'Luiyp Education is India\'s leading educational platform dedicated to providing affordable and quality education to students across the country.'),
           style: TextStyle(
             color: Colors.grey.shade400,
             height: 1.5,
@@ -3393,7 +4051,7 @@ class Footer extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              'support@luiypedu.com',
+              _getWebsiteContent('footerEmail', 'support@luiypedu.com'),
               style: TextStyle(
                 color: Colors.grey.shade400,
               ),
@@ -3410,7 +4068,7 @@ class Footer extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              '+91 1234567890',
+              _getWebsiteContent('footerPhone', '+91 1234567890'),
               style: TextStyle(
                 color: Colors.grey.shade400,
               ),
@@ -3429,6 +4087,8 @@ class Footer extends StatelessWidget {
           'Success Stories',
           'Blog',
           'Admin',
+          'Teacher',
+          'Franchise',
         ]),
 
         _buildMobileExpandableSection(context, 'Resources', [
@@ -3528,5 +4188,3 @@ class Footer extends StatelessWidget {
     );
   }
 }
-
-// Generic Coming Soon Screen for unimplemented pages

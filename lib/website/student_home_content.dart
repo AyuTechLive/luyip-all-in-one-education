@@ -25,6 +25,45 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
+  // Website Content Controllers
+  final TextEditingController _logoUrlController = TextEditingController();
+  final TextEditingController _companyNameController = TextEditingController();
+  final TextEditingController _companyShortNameController =
+      TextEditingController();
+  final TextEditingController _heroTitleController = TextEditingController();
+  final TextEditingController _heroSubtitleController = TextEditingController();
+  final TextEditingController _bharatLine1Controller = TextEditingController();
+  final TextEditingController _bharatLine2Controller = TextEditingController();
+  final TextEditingController _bharatLine3Controller = TextEditingController();
+  final TextEditingController _statsTitleController = TextEditingController();
+  final TextEditingController _statsSubtitleController =
+      TextEditingController();
+  final TextEditingController _coursesTitleController = TextEditingController();
+  final TextEditingController _coursesSubtitleController =
+      TextEditingController();
+  final TextEditingController _getStartedTitleController =
+      TextEditingController();
+  final TextEditingController _getStartedSubtitleController =
+      TextEditingController();
+  final TextEditingController _getStartedButton1Controller =
+      TextEditingController();
+  final TextEditingController _getStartedButton2Controller =
+      TextEditingController();
+  final TextEditingController _footerDescriptionController =
+      TextEditingController();
+  final TextEditingController _footerEmailController = TextEditingController();
+  final TextEditingController _footerPhoneController = TextEditingController();
+  final TextEditingController _copyrightTextController =
+      TextEditingController();
+  final TextEditingController _loadingTextController = TextEditingController();
+  final TextEditingController _contactNumberController =
+      TextEditingController();
+
+  // Logo image handling
+  XFile? _pickedLogoImage;
+  Uint8List? _webLogoImage;
+  File? _logoImageFile;
+
   // Banners
   final TextEditingController _bannerTitleController = TextEditingController();
   final TextEditingController _bannerSubtitleController =
@@ -34,6 +73,11 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
   XFile? _pickedBannerImage;
   Uint8List? _webBannerImage;
   File? _bannerImageFile;
+
+  // Stats Controllers
+  final TextEditingController _statCountController = TextEditingController();
+  final TextEditingController _statLabelController = TextEditingController();
+  String _selectedStatColor = 'purple';
 
   // Announcements
   final TextEditingController _announcementTitleController =
@@ -72,16 +116,44 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController =
+        TabController(length: 6, vsync: this); // Increased to 6 tabs
     _websiteDataFuture = _fetchWebsiteData();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    // Website content controllers
+    _logoUrlController.dispose();
+    _companyNameController.dispose();
+    _companyShortNameController.dispose();
+    _heroTitleController.dispose();
+    _heroSubtitleController.dispose();
+    _bharatLine1Controller.dispose();
+    _bharatLine2Controller.dispose();
+    _bharatLine3Controller.dispose();
+    _statsTitleController.dispose();
+    _statsSubtitleController.dispose();
+    _coursesTitleController.dispose();
+    _coursesSubtitleController.dispose();
+    _getStartedTitleController.dispose();
+    _getStartedSubtitleController.dispose();
+    _getStartedButton1Controller.dispose();
+    _getStartedButton2Controller.dispose();
+    _footerDescriptionController.dispose();
+    _footerEmailController.dispose();
+    _footerPhoneController.dispose();
+    _copyrightTextController.dispose();
+    _loadingTextController.dispose();
+    _contactNumberController.dispose();
+
+    // Other controllers
     _bannerTitleController.dispose();
     _bannerSubtitleController.dispose();
     _bannerCtaController.dispose();
+    _statCountController.dispose();
+    _statLabelController.dispose();
     _announcementTitleController.dispose();
     _announcementContentController.dispose();
     _eventTitleController.dispose();
@@ -95,25 +167,45 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
 
   Future<Map<String, dynamic>> _fetchWebsiteData() async {
     Map<String, dynamic> websiteData = {
-      'banners': [],
-      'announcements': [],
-      'upcomingEvents': [],
-      'testimonials': [],
+      'banners': <Map<String, dynamic>>[],
+      'announcements': <Map<String, dynamic>>[],
+      'upcomingEvents': <Map<String, dynamic>>[],
+      'testimonials': <Map<String, dynamic>>[],
+      'stats': <Map<String, dynamic>>[],
+      'websiteContent': <String, dynamic>{},
     };
 
     try {
+      // Fetch main dashboard data
       final doc =
           await _firestore.collection('website_general').doc('dashboard').get();
-
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         websiteData = {
-          'banners': data['banners'] ?? [],
-          'announcements': data['announcements'] ?? [],
-          'upcomingEvents': data['upcomingEvents'] ?? [],
-          'testimonials': data['testimonials'] ?? [],
+          'banners': List<Map<String, dynamic>>.from(data['banners'] ?? []),
+          'announcements':
+              List<Map<String, dynamic>>.from(data['announcements'] ?? []),
+          'upcomingEvents':
+              List<Map<String, dynamic>>.from(data['upcomingEvents'] ?? []),
+          'testimonials':
+              List<Map<String, dynamic>>.from(data['testimonials'] ?? []),
+          'websiteContent':
+              Map<String, dynamic>.from(data['websiteContent'] ?? {}),
         };
       }
+
+      // Fetch stats data
+      final statsDoc =
+          await _firestore.collection('website_general').doc('stats').get();
+      if (statsDoc.exists) {
+        final statsData = statsDoc.data() as Map<String, dynamic>;
+        websiteData['stats'] =
+            List<Map<String, dynamic>>.from(statsData['stats'] ?? []);
+      }
+
+      // Populate form controllers with existing data
+      _populateFormControllers(
+          websiteData['websiteContent'] as Map<String, dynamic>);
 
       return websiteData;
     } catch (e) {
@@ -122,16 +214,85 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
     }
   }
 
+  void _populateFormControllers(Map<String, dynamic> websiteContent) {
+    _logoUrlController.text = websiteContent['logoUrl']?.toString() ?? '';
+    _companyNameController.text =
+        websiteContent['companyName']?.toString() ?? 'Luiyp Education';
+    _companyShortNameController.text =
+        websiteContent['companyShortName']?.toString() ?? 'LE';
+    _heroTitleController.text = websiteContent['heroTitle']?.toString() ??
+        'Building Futures Through Quality Education';
+    _heroSubtitleController.text = websiteContent['heroSubtitle']?.toString() ??
+        'Luiyp Education aims to transform education in India by providing affordable and quality learning opportunities for all.';
+    _bharatLine1Controller.text =
+        websiteContent['bharatLine1']?.toString() ?? "Bharat's ";
+    _bharatLine2Controller.text =
+        websiteContent['bharatLine2']?.toString() ?? "Trusted & Affordable";
+    _bharatLine3Controller.text =
+        websiteContent['bharatLine3']?.toString() ?? "Educational Platform";
+    _statsTitleController.text =
+        websiteContent['statsTitle']?.toString() ?? 'Our Impact in Numbers';
+    _statsSubtitleController.text = websiteContent['statsSubtitle']
+            ?.toString() ??
+        'Join millions of students who have already transformed their educational journey with Luiyp Education';
+    _coursesTitleController.text =
+        websiteContent['coursesTitle']?.toString() ?? 'Featured Courses';
+    _coursesSubtitleController.text = websiteContent['coursesSubtitle']
+            ?.toString() ??
+        'Explore our top-rated courses designed to help you achieve academic excellence';
+    _getStartedTitleController.text =
+        websiteContent['getStartedTitle']?.toString() ??
+            'Ready to Transform Your Learning Journey?';
+    _getStartedSubtitleController.text = websiteContent['getStartedSubtitle']
+            ?.toString() ??
+        'Join Luiyp Education today and experience the best in educational content, expert guidance, and comprehensive exam preparation.';
+    _getStartedButton1Controller.text =
+        websiteContent['getStartedButton1']?.toString() ?? 'Get Started';
+    _getStartedButton2Controller.text =
+        websiteContent['getStartedButton2']?.toString() ?? 'Contact Us';
+    _footerDescriptionController.text = websiteContent['footerDescription']
+            ?.toString() ??
+        'Luiyp Education is India\'s leading educational platform dedicated to providing affordable and quality education to students across the country.';
+    _footerEmailController.text =
+        websiteContent['footerEmail']?.toString() ?? 'support@luiypedu.com';
+    _footerPhoneController.text =
+        websiteContent['footerPhone']?.toString() ?? '+91 1234567890';
+    _copyrightTextController.text =
+        websiteContent['copyrightText']?.toString() ??
+            'Luiyp Education. All rights reserved.';
+    _loadingTextController.text = websiteContent['loadingText']?.toString() ??
+        'Loading your educational journey...';
+    _contactNumberController.text =
+        websiteContent['contactNumber']?.toString() ?? '+911234567890';
+  }
+
   Future<void> _saveWebsiteData(Map<String, dynamic> websiteData) async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      await _firestore
-          .collection('website_general')
-          .doc('dashboard')
-          .set(websiteData);
+      // Save main dashboard data
+      await _firestore.collection('website_general').doc('dashboard').set({
+        'banners':
+            List<Map<String, dynamic>>.from(websiteData['banners'] ?? []),
+        'announcements':
+            List<Map<String, dynamic>>.from(websiteData['announcements'] ?? []),
+        'upcomingEvents': List<Map<String, dynamic>>.from(
+            websiteData['upcomingEvents'] ?? []),
+        'testimonials':
+            List<Map<String, dynamic>>.from(websiteData['testimonials'] ?? []),
+        'websiteContent':
+            Map<String, dynamic>.from(websiteData['websiteContent'] ?? {}),
+      });
+
+      // Save stats data separately
+      if (websiteData['stats'] != null) {
+        await _firestore.collection('website_general').doc('stats').set({
+          'stats': List<Map<String, dynamic>>.from(websiteData['stats']),
+        });
+      }
+
       Utils().toastMessage('Website data updated successfully');
     } catch (e) {
       Utils().toastMessage('Error updating website data: $e');
@@ -148,6 +309,50 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
     });
   }
 
+  Future<void> _pickLogoImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      _pickedLogoImage = pickedFile;
+
+      if (kIsWeb) {
+        _webLogoImage = await pickedFile.readAsBytes();
+        setState(() {});
+      } else {
+        setState(() {
+          _logoImageFile = File(pickedFile.path);
+        });
+      }
+    }
+  }
+
+  Future<String?> _uploadLogoImage() async {
+    if (_pickedLogoImage == null) return null;
+
+    try {
+      final fileName = 'logo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final ref = _storage.ref().child('website/$fileName');
+
+      UploadTask uploadTask;
+      if (kIsWeb) {
+        uploadTask = ref.putData(
+          await _pickedLogoImage!.readAsBytes(),
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+      } else {
+        uploadTask = ref.putFile(_logoImageFile!);
+      }
+
+      final snapshot = await uploadTask;
+      return await snapshot.ref.getDownloadURL();
+    } catch (e) {
+      print('Error uploading logo: $e');
+      return null;
+    }
+  }
+
+  // [Keep all existing image picker and upload methods for banners, testimonials, etc.]
   Future<void> _pickBannerImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -275,9 +480,11 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
           indicatorColor: ColorManager.primary,
           isScrollable: isSmallScreen,
           labelStyle: TextStyle(
-              fontSize: isSmallScreen ? 12 : 14, fontWeight: FontWeight.w600),
+              fontSize: isSmallScreen ? 10 : 14, fontWeight: FontWeight.w600),
           tabs: const [
+            Tab(text: 'Website Info'),
             Tab(text: 'Banners'),
+            Tab(text: 'Stats'),
             Tab(text: 'Announcements'),
             Tab(text: 'Events'),
             Tab(text: 'Testimonials'),
@@ -317,15 +524,25 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
           }
 
           final websiteData = snapshot.data!;
-          final banners = websiteData['banners'] as List;
-          final announcements = websiteData['announcements'] as List;
-          final upcomingEvents = websiteData['upcomingEvents'] as List;
-          final testimonials = websiteData['testimonials'] as List;
+          final banners =
+              List<Map<String, dynamic>>.from(websiteData['banners'] ?? []);
+          final announcements = List<Map<String, dynamic>>.from(
+              websiteData['announcements'] ?? []);
+          final upcomingEvents = List<Map<String, dynamic>>.from(
+              websiteData['upcomingEvents'] ?? []);
+          final testimonials = List<Map<String, dynamic>>.from(
+              websiteData['testimonials'] ?? []);
+          final stats =
+              List<Map<String, dynamic>>.from(websiteData['stats'] ?? []);
+          final websiteContent =
+              Map<String, dynamic>.from(websiteData['websiteContent'] ?? {});
 
           return TabBarView(
             controller: _tabController,
             children: [
+              _buildWebsiteInfoTab(websiteContent, websiteData, isSmallScreen),
               _buildBannersTab(banners, websiteData, isSmallScreen),
+              _buildStatsTab(stats, websiteData, isSmallScreen),
               _buildAnnouncementsTab(announcements, websiteData, isSmallScreen),
               _buildEventsTab(upcomingEvents, websiteData, isSmallScreen),
               _buildTestimonialsTab(testimonials, websiteData, isSmallScreen),
@@ -336,8 +553,655 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
     );
   }
 
-  Widget _buildBannersTab(
-      List banners, Map<String, dynamic> websiteData, bool isSmallScreen) {
+  Widget _buildWebsiteInfoTab(Map<String, dynamic> websiteContent,
+      Map<String, dynamic> websiteData, bool isSmallScreen) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Website General Information',
+            style: TextStyle(
+              fontSize: isSmallScreen ? 18 : 20,
+              fontWeight: FontWeight.bold,
+              color: ColorManager.textDark,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Company Info Section
+          _buildSectionCard(
+            'Company Information',
+            [
+              _buildLogoUploadSection(isSmallScreen),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _companyNameController,
+                decoration: _inputDecoration('Company Name'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _companyShortNameController,
+                decoration:
+                    _inputDecoration('Company Short Name (for logo fallback)'),
+                maxLength: 5,
+              ),
+            ],
+            isSmallScreen,
+          ),
+
+          const SizedBox(height: 20),
+
+          // Hero Section
+          _buildSectionCard(
+            'Hero Section',
+            [
+              TextField(
+                controller: _heroTitleController,
+                decoration: _inputDecoration('Hero Title'),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _heroSubtitleController,
+                decoration: _inputDecoration('Hero Subtitle'),
+                maxLines: 3,
+              ),
+            ],
+            isSmallScreen,
+          ),
+
+          const SizedBox(height: 20),
+
+          // Bharat Section
+          _buildSectionCard(
+            'Bharat Section (3 Lines)',
+            [
+              TextField(
+                controller: _bharatLine1Controller,
+                decoration: _inputDecoration('First Line (e.g., "Bharat\'s")'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _bharatLine2Controller,
+                decoration: _inputDecoration(
+                    'Second Line (e.g., "Trusted & Affordable")'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _bharatLine3Controller,
+                decoration: _inputDecoration(
+                    'Third Line (e.g., "Educational Platform")'),
+              ),
+            ],
+            isSmallScreen,
+          ),
+
+          const SizedBox(height: 20),
+
+          // Stats Section
+          _buildSectionCard(
+            'Stats Section Titles',
+            [
+              TextField(
+                controller: _statsTitleController,
+                decoration: _inputDecoration('Stats Section Title'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _statsSubtitleController,
+                decoration: _inputDecoration('Stats Section Subtitle'),
+                maxLines: 2,
+              ),
+            ],
+            isSmallScreen,
+          ),
+
+          const SizedBox(height: 20),
+
+          // Courses Section
+          _buildSectionCard(
+            'Courses Section',
+            [
+              TextField(
+                controller: _coursesTitleController,
+                decoration: _inputDecoration('Courses Section Title'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _coursesSubtitleController,
+                decoration: _inputDecoration('Courses Section Subtitle'),
+                maxLines: 2,
+              ),
+            ],
+            isSmallScreen,
+          ),
+
+          const SizedBox(height: 20),
+
+          // Get Started Section
+          _buildSectionCard(
+            'Get Started Section',
+            [
+              TextField(
+                controller: _getStartedTitleController,
+                decoration: _inputDecoration('Get Started Title'),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _getStartedSubtitleController,
+                decoration: _inputDecoration('Get Started Subtitle'),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _getStartedButton1Controller,
+                decoration: _inputDecoration('First Button Text'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _getStartedButton2Controller,
+                decoration: _inputDecoration('Second Button Text'),
+              ),
+            ],
+            isSmallScreen,
+          ),
+
+          const SizedBox(height: 20),
+
+          // Footer Section
+          _buildSectionCard(
+            'Footer Information',
+            [
+              TextField(
+                controller: _footerDescriptionController,
+                decoration: _inputDecoration('Footer Description'),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _footerEmailController,
+                decoration: _inputDecoration('Footer Email'),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _footerPhoneController,
+                decoration: _inputDecoration('Footer Phone'),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _copyrightTextController,
+                decoration: _inputDecoration('Copyright Text'),
+              ),
+            ],
+            isSmallScreen,
+          ),
+
+          const SizedBox(height: 20),
+
+          // Other Settings
+          _buildSectionCard(
+            'Other Settings',
+            [
+              TextField(
+                controller: _loadingTextController,
+                decoration: _inputDecoration('Loading Screen Text'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _contactNumberController,
+                decoration:
+                    _inputDecoration('Contact Number (for floating button)'),
+                keyboardType: TextInputType.phone,
+              ),
+            ],
+            isSmallScreen,
+          ),
+
+          const SizedBox(height: 30),
+
+          // Save Button
+          Center(
+            child: _isLoading
+                ? CircularProgressIndicator(color: ColorManager.primary)
+                : ElevatedButton.icon(
+                    onPressed: () => _saveWebsiteContent(websiteData),
+                    icon: const Icon(Icons.save, size: 20),
+                    label: const Text('Save Website Information'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ColorManager.primary,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isSmallScreen ? 20 : 32,
+                        vertical: isSmallScreen ? 12 : 16,
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionCard(
+      String title, List<Widget> children, bool isSmallScreen) {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: ColorManager.textDark,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogoUploadSection(bool isSmallScreen) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Company Logo',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: ColorManager.textDark,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _logoUrlController,
+                decoration: _inputDecoration('Logo URL (or upload new)'),
+                onChanged: (value) {
+                  setState(() {}); // Refresh to show URL preview
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: _pickLogoImage,
+              icon: const Icon(Icons.upload, size: 18),
+              label: const Text('Upload'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ColorManager.secondary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          height: 100,
+          width: 100,
+          decoration: BoxDecoration(
+            color: ColorManager.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: ColorManager.primary.withOpacity(0.3)),
+          ),
+          child: _buildLogoPreview(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLogoPreview() {
+    // Show picked image first
+    if (_pickedLogoImage != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: kIsWeb
+            ? Image.memory(_webLogoImage!, fit: BoxFit.cover)
+            : Image.file(_logoImageFile!, fit: BoxFit.cover),
+      );
+    }
+
+    // Show URL image if available
+    if (_logoUrlController.text.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(
+          _logoUrlController.text,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => Icon(
+            Icons.image_not_supported,
+            color: ColorManager.primary,
+            size: 30,
+          ),
+        ),
+      );
+    }
+
+    // Default placeholder
+    return Icon(
+      Icons.business,
+      color: ColorManager.primary,
+      size: 30,
+    );
+  }
+
+  Future<void> _saveWebsiteContent(Map<String, dynamic> websiteData) async {
+    setState(() => _isLoading = true);
+
+    try {
+      // Upload logo if new image was picked
+      String? logoUrl;
+      if (_pickedLogoImage != null) {
+        logoUrl = await _uploadLogoImage();
+      } else {
+        logoUrl = _logoUrlController.text;
+      }
+
+      // Build website content map
+      final websiteContent = {
+        'logoUrl': logoUrl ?? '',
+        'companyName': _companyNameController.text,
+        'companyShortName': _companyShortNameController.text,
+        'heroTitle': _heroTitleController.text,
+        'heroSubtitle': _heroSubtitleController.text,
+        'bharatLine1': _bharatLine1Controller.text,
+        'bharatLine2': _bharatLine2Controller.text,
+        'bharatLine3': _bharatLine3Controller.text,
+        'statsTitle': _statsTitleController.text,
+        'statsSubtitle': _statsSubtitleController.text,
+        'coursesTitle': _coursesTitleController.text,
+        'coursesSubtitle': _coursesSubtitleController.text,
+        'getStartedTitle': _getStartedTitleController.text,
+        'getStartedSubtitle': _getStartedSubtitleController.text,
+        'getStartedButton1': _getStartedButton1Controller.text,
+        'getStartedButton2': _getStartedButton2Controller.text,
+        'footerDescription': _footerDescriptionController.text,
+        'footerEmail': _footerEmailController.text,
+        'footerPhone': _footerPhoneController.text,
+        'copyrightText': _copyrightTextController.text,
+        'loadingText': _loadingTextController.text,
+        'contactNumber': _contactNumberController.text,
+      };
+
+      // Update the website data
+      final updatedData = {
+        ...websiteData,
+        'websiteContent': websiteContent,
+      };
+
+      await _saveWebsiteData(updatedData);
+
+      // Clear picked image after successful upload
+      setState(() {
+        _pickedLogoImage = null;
+        _webLogoImage = null;
+        _logoImageFile = null;
+      });
+
+      await _refreshData();
+    } catch (e) {
+      Utils().toastMessage('Error saving website content: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Widget _buildStatsTab(List<Map<String, dynamic>> stats,
+      Map<String, dynamic> websiteData, bool isSmallScreen) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Manage Platform Statistics',
+            style: TextStyle(
+              fontSize: isSmallScreen ? 18 : 20,
+              fontWeight: FontWeight.bold,
+              color: ColorManager.textDark,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Add New Stat Form
+          Card(
+            elevation: 3,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Add New Statistic',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: ColorManager.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (isSmallScreen) ...[
+                    TextField(
+                      controller: _statCountController,
+                      decoration: _inputDecoration('Count (e.g., 15Million+)'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _statLabelController,
+                      decoration:
+                          _inputDecoration('Label (e.g., Happy Students)'),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildStatColorDropdown(),
+                  ] else
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _statCountController,
+                            decoration:
+                                _inputDecoration('Count (e.g., 15Million+)'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _statLabelController,
+                            decoration: _inputDecoration(
+                                'Label (e.g., Happy Students)'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildStatColorDropdown()),
+                      ],
+                    ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => _addStat(stats, websiteData),
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Add Statistic'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: ColorManager.primary,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 12 : 16,
+                            vertical: isSmallScreen ? 8 : 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+          Text(
+            'Current Statistics (${stats.length})',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: ColorManager.textDark,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // List of existing stats
+          if (stats.isEmpty)
+            _buildEmptyState('No statistics yet', Icons.bar_chart_outlined)
+          else
+            ...stats.asMap().entries.map((entry) {
+              final index = entry.key;
+              final stat = entry.value;
+              return _buildStatCard(
+                  stat, index, stats, websiteData, isSmallScreen);
+            }).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatColorDropdown() {
+    return DropdownButtonFormField<String>(
+      decoration: _inputDecoration('Color'),
+      value: _selectedStatColor,
+      isExpanded: true,
+      items: _bannerColors.map((colorData) {
+        return DropdownMenuItem<String>(
+          value: colorData['value'],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: colorData['color'],
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(colorData['name']),
+            ],
+          ),
+        );
+      }).toList(),
+      onChanged: (String? value) {
+        setState(() {
+          _selectedStatColor = value ?? 'purple';
+        });
+      },
+    );
+  }
+
+  Widget _buildStatCard(
+      Map<String, dynamic> stat,
+      int index,
+      List<Map<String, dynamic>> stats,
+      Map<String, dynamic> websiteData,
+      bool isSmallScreen) {
+    final color = _getColorFromString(stat['color'] ?? 'purple');
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: ListTile(
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 12 : 16,
+          vertical: isSmallScreen ? 4 : 8,
+        ),
+        leading: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Center(
+            child: Text(
+              stat['count'] ?? '0+',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+        title: Text(
+          stat['label'] ?? 'Statistic',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          '${stat['count']} - ${stat['color']} theme',
+          style: TextStyle(color: ColorManager.textMedium),
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete, color: Colors.red),
+          onPressed: () => _deleteStat(index, stats, websiteData),
+        ),
+      ),
+    );
+  }
+
+  void _addStat(
+      List<Map<String, dynamic>> stats, Map<String, dynamic> websiteData) {
+    if (_statCountController.text.isEmpty ||
+        _statLabelController.text.isEmpty) {
+      Utils().toastMessage('Please fill in all fields');
+      return;
+    }
+
+    final newStat = {
+      'count': _statCountController.text,
+      'label': _statLabelController.text,
+      'color': _selectedStatColor,
+    };
+
+    List<Map<String, dynamic>> updatedStats = [...stats, newStat];
+    final updatedData = {...websiteData, 'stats': updatedStats};
+
+    _saveWebsiteData(updatedData).then((_) {
+      _statCountController.clear();
+      _statLabelController.clear();
+      setState(() => _selectedStatColor = 'purple');
+      _refreshData();
+    });
+  }
+
+  void _deleteStat(int index, List<Map<String, dynamic>> stats,
+      Map<String, dynamic> websiteData) {
+    List<Map<String, dynamic>> updatedStats = List.from(stats)..removeAt(index);
+    final updatedData = {...websiteData, 'stats': updatedStats};
+    _saveWebsiteData(updatedData).then((_) => _refreshData());
+  }
+
+  // Keep all existing methods for banners, announcements, events, testimonials...
+
+  Widget _buildBannersTab(List<Map<String, dynamic>> banners,
+      Map<String, dynamic> websiteData, bool isSmallScreen) {
     return SingleChildScrollView(
       padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
       child: Column(
@@ -596,8 +1460,12 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
     );
   }
 
-  Widget _buildBannerCard(Map<String, dynamic> banner, int index, List banners,
-      Map<String, dynamic> websiteData, bool isSmallScreen) {
+  Widget _buildBannerCard(
+      Map<String, dynamic> banner,
+      int index,
+      List<Map<String, dynamic>> banners,
+      Map<String, dynamic> websiteData,
+      bool isSmallScreen) {
     final color = _getColorFromString(banner['color'] ?? 'purple');
 
     return Card(
@@ -614,8 +1482,12 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
     );
   }
 
-  Widget _buildMobileBannerCard(Map<String, dynamic> banner, Color color,
-      int index, List banners, Map<String, dynamic> websiteData) {
+  Widget _buildMobileBannerCard(
+      Map<String, dynamic> banner,
+      Color color,
+      int index,
+      List<Map<String, dynamic>> banners,
+      Map<String, dynamic> websiteData) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -680,8 +1552,12 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
     );
   }
 
-  Widget _buildDesktopBannerCard(Map<String, dynamic> banner, Color color,
-      int index, List banners, Map<String, dynamic> websiteData) {
+  Widget _buildDesktopBannerCard(
+      Map<String, dynamic> banner,
+      Color color,
+      int index,
+      List<Map<String, dynamic>> banners,
+      Map<String, dynamic> websiteData) {
     return Row(
       children: [
         Icon(Icons.drag_handle, color: Colors.grey),
@@ -758,7 +1634,8 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
     );
   }
 
-  Widget _buildAnnouncementsTab(List announcements,
+  // Keep all existing methods for announcements, events, testimonials...
+  Widget _buildAnnouncementsTab(List<Map<String, dynamic>> announcements,
       Map<String, dynamic> websiteData, bool isSmallScreen) {
     return SingleChildScrollView(
       padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
@@ -858,7 +1735,7 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
   Widget _buildAnnouncementCard(
       Map<String, dynamic> announcement,
       int index,
-      List announcements,
+      List<Map<String, dynamic>> announcements,
       Map<String, dynamic> websiteData,
       bool isSmallScreen) {
     return Card(
@@ -900,8 +1777,8 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
     );
   }
 
-  Widget _buildEventsTab(List upcomingEvents, Map<String, dynamic> websiteData,
-      bool isSmallScreen) {
+  Widget _buildEventsTab(List<Map<String, dynamic>> upcomingEvents,
+      Map<String, dynamic> websiteData, bool isSmallScreen) {
     return SingleChildScrollView(
       padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
       child: Column(
@@ -1045,7 +1922,7 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
   Widget _buildEventCard(
       Map<String, dynamic> event,
       int index,
-      List upcomingEvents,
+      List<Map<String, dynamic>> upcomingEvents,
       Map<String, dynamic> websiteData,
       bool isSmallScreen) {
     return Card(
@@ -1090,8 +1967,8 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
     );
   }
 
-  Widget _buildTestimonialsTab(
-      List testimonials, Map<String, dynamic> websiteData, bool isSmallScreen) {
+  Widget _buildTestimonialsTab(List<Map<String, dynamic>> testimonials,
+      Map<String, dynamic> websiteData, bool isSmallScreen) {
     return SingleChildScrollView(
       padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
       child: Column(
@@ -1293,8 +2170,12 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
     );
   }
 
-  Widget _buildTestimonialCard(Map<String, dynamic> testimonial, int index,
-      List testimonials, Map<String, dynamic> websiteData, bool isSmallScreen) {
+  Widget _buildTestimonialCard(
+      Map<String, dynamic> testimonial,
+      int index,
+      List<Map<String, dynamic>> testimonials,
+      Map<String, dynamic> websiteData,
+      bool isSmallScreen) {
     final String name = testimonial['name'] ?? 'Student';
     final String courseName = testimonial['courseName'] ?? '';
     final String content = testimonial['content'] ?? '';
@@ -1325,7 +2206,7 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
       double rating,
       String photoUrl,
       int index,
-      List testimonials,
+      List<Map<String, dynamic>> testimonials,
       Map<String, dynamic> websiteData) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1413,7 +2294,7 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
       double rating,
       String photoUrl,
       int index,
-      List testimonials,
+      List<Map<String, dynamic>> testimonials,
       Map<String, dynamic> websiteData) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1518,8 +2399,8 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
   }
 
   // Action methods
-  Future<void> _addBanner(
-      List banners, Map<String, dynamic> websiteData) async {
+  Future<void> _addBanner(List<Map<String, dynamic>> banners,
+      Map<String, dynamic> websiteData) async {
     if (_bannerTitleController.text.isEmpty ||
         _bannerSubtitleController.text.isEmpty ||
         _bannerCtaController.text.isEmpty) {
@@ -1543,7 +2424,7 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     };
 
-    List updatedBanners = [...banners, newBanner];
+    List<Map<String, dynamic>> updatedBanners = [...banners, newBanner];
     final updatedData = {...websiteData, 'banners': updatedBanners};
 
     await _saveWebsiteData(updatedData);
@@ -1560,14 +2441,16 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
     await _refreshData();
   }
 
-  void _deleteBanner(
-      int index, List banners, Map<String, dynamic> websiteData) {
-    List updatedBanners = List.from(banners)..removeAt(index);
+  void _deleteBanner(int index, List<Map<String, dynamic>> banners,
+      Map<String, dynamic> websiteData) {
+    List<Map<String, dynamic>> updatedBanners = List.from(banners)
+      ..removeAt(index);
     final updatedData = {...websiteData, 'banners': updatedBanners};
     _saveWebsiteData(updatedData).then((_) => _refreshData());
   }
 
-  void _addAnnouncement(List announcements, Map<String, dynamic> websiteData) {
+  void _addAnnouncement(List<Map<String, dynamic>> announcements,
+      Map<String, dynamic> websiteData) {
     if (_announcementTitleController.text.isEmpty ||
         _announcementContentController.text.isEmpty) {
       Utils().toastMessage('Please fill in all fields');
@@ -1584,7 +2467,10 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
       'timestamp': now.millisecondsSinceEpoch,
     };
 
-    List updatedAnnouncements = [...announcements, newAnnouncement];
+    List<Map<String, dynamic>> updatedAnnouncements = [
+      ...announcements,
+      newAnnouncement
+    ];
     final updatedData = {...websiteData, 'announcements': updatedAnnouncements};
 
     _saveWebsiteData(updatedData).then((_) {
@@ -1594,14 +2480,16 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
     });
   }
 
-  void _deleteAnnouncement(
-      int index, List announcements, Map<String, dynamic> websiteData) {
-    List updatedAnnouncements = List.from(announcements)..removeAt(index);
+  void _deleteAnnouncement(int index, List<Map<String, dynamic>> announcements,
+      Map<String, dynamic> websiteData) {
+    List<Map<String, dynamic>> updatedAnnouncements = List.from(announcements)
+      ..removeAt(index);
     final updatedData = {...websiteData, 'announcements': updatedAnnouncements};
     _saveWebsiteData(updatedData).then((_) => _refreshData());
   }
 
-  void _addEvent(List upcomingEvents, Map<String, dynamic> websiteData) {
+  void _addEvent(List<Map<String, dynamic>> upcomingEvents,
+      Map<String, dynamic> websiteData) {
     if (_eventTitleController.text.isEmpty ||
         _eventCategoryController.text.isEmpty ||
         _eventTimeController.text.isEmpty ||
@@ -1620,7 +2508,7 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
       'date': Timestamp.fromDate(_selectedEventDate!),
     };
 
-    List updatedEvents = [...upcomingEvents, newEvent];
+    List<Map<String, dynamic>> updatedEvents = [...upcomingEvents, newEvent];
     final updatedData = {...websiteData, 'upcomingEvents': updatedEvents};
 
     _saveWebsiteData(updatedData).then((_) {
@@ -1632,15 +2520,16 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
     });
   }
 
-  void _deleteEvent(
-      int index, List upcomingEvents, Map<String, dynamic> websiteData) {
-    List updatedEvents = List.from(upcomingEvents)..removeAt(index);
+  void _deleteEvent(int index, List<Map<String, dynamic>> upcomingEvents,
+      Map<String, dynamic> websiteData) {
+    List<Map<String, dynamic>> updatedEvents = List.from(upcomingEvents)
+      ..removeAt(index);
     final updatedData = {...websiteData, 'upcomingEvents': updatedEvents};
     _saveWebsiteData(updatedData).then((_) => _refreshData());
   }
 
-  Future<void> _addTestimonial(
-      List testimonials, Map<String, dynamic> websiteData) async {
+  Future<void> _addTestimonial(List<Map<String, dynamic>> testimonials,
+      Map<String, dynamic> websiteData) async {
     if (_testimonialNameController.text.isEmpty ||
         _testimonialCourseController.text.isEmpty ||
         _testimonialContentController.text.isEmpty) {
@@ -1664,7 +2553,10 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     };
 
-    List updatedTestimonials = [...testimonials, newTestimonial];
+    List<Map<String, dynamic>> updatedTestimonials = [
+      ...testimonials,
+      newTestimonial
+    ];
     final updatedData = {...websiteData, 'testimonials': updatedTestimonials};
 
     await _saveWebsiteData(updatedData);
