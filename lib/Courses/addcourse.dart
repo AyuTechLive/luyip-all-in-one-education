@@ -11,7 +11,15 @@ import 'package:luyip_website_edu/helpers/colors.dart';
 
 class AddCourse extends StatefulWidget {
   final Function? onCourseAdded;
-  const AddCourse({super.key, this.onCourseAdded});
+  final DocumentSnapshot? courseDoc; // For editing existing courses
+  final bool isEditing; // Flag to determine if we're editing
+
+  const AddCourse({
+    super.key,
+    this.onCourseAdded,
+    this.courseDoc,
+    this.isEditing = false,
+  });
 
   @override
   State<AddCourse> createState() => _AddCourseState();
@@ -108,6 +116,9 @@ class _AddCourseState extends State<AddCourse> {
   // Use the ImageUploadHandler instead of direct File handling
   late ImageUploadHandler imageHandler;
 
+  // Store original course name for editing
+  String? originalCourseName;
+
   Future<void> _handleFileUpload({
     required FileUploadHandler handler,
     required TextEditingController controller,
@@ -128,6 +139,54 @@ class _AddCourseState extends State<AddCourse> {
     }
   }
 
+  void _loadCourseDataForEditing() {
+    if (widget.courseDoc == null) return;
+
+    final data = widget.courseDoc!.data() as Map<String, dynamic>;
+
+    // Store original course name
+    originalCourseName = data['Course Name'];
+
+    // Basic info
+    coursenamecontroller.text = data['Course Name'] ?? '';
+    coursediscriptioncontroller.text = data['Course Discription'] ?? '';
+    coursepricecontroller.text = data['Course Price'] ?? '';
+    courseimglinkcontroller.text = data['Course Img Link'] ?? '';
+
+    // Additional fields
+    selectedCategory = data['Category'] ?? 'Programming';
+    difficultyController.text = data['Difficulty'] ?? '';
+    discountPercentageController.text = data['Membership Discount'] ?? '';
+    durationController.text = data['Duration'] ?? '';
+    prerequisitesController.text = data['Prerequisites'] ?? '';
+    isFeaturesCourse = data['Is Featured'] ?? false;
+
+    // Load preview/materials
+    previewVideoController.text = data['PreviewVideo'] ?? '';
+    previewPdfController.text = data['PreviewPDF'] ?? '';
+    syllabusPdfController.text = data['SyllabusPDF'] ?? '';
+    schedulePdfController.text = data['SchedulePDF'] ?? '';
+
+    // Load dynamic content
+    learningObjectives = List<String>.from(data['LearningObjectives'] ?? []);
+    featureCards = List<Map<String, dynamic>>.from(data['FeatureCards'] ?? []);
+    keyDocuments = List<Map<String, dynamic>>.from(data['KeyDocuments'] ?? []);
+
+    // Load teachers
+    List<dynamic> teachersData = data['Teachers'] ?? [];
+    selectedTeachers = teachersData
+        .map((teacher) => {
+              'Name': teacher['Name'] ?? '',
+              'Email': teacher['Email'] ?? '',
+              'ProfilePicURL': teacher['ProfilePicURL'] ?? '',
+              'Subject': teacher['Subject'] ?? '',
+              'Qualification': teacher['Qualification'] ?? '',
+              'Experience': teacher['Experience'] ?? '',
+              'Rating': teacher['Rating'] ?? '4.5',
+            })
+        .toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -136,6 +195,11 @@ class _AddCourseState extends State<AddCourse> {
     schedulePdfHandler = FileUploadHandler();
     documentUploadHandler = FileUploadHandler();
     imageHandler = ImageUploadHandler();
+
+    // Load existing course data if editing
+    if (widget.isEditing && widget.courseDoc != null) {
+      _loadCourseDataForEditing();
+    }
   }
 
   @override
@@ -146,9 +210,9 @@ class _AddCourseState extends State<AddCourse> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text(
-          'Create New Course',
-          style: TextStyle(
+        title: Text(
+          widget.isEditing ? 'Edit Course' : 'Create New Course',
+          style: const TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 24,
           ),
@@ -158,6 +222,38 @@ class _AddCourseState extends State<AddCourse> {
         elevation: 0,
         centerTitle: false,
         toolbarHeight: 80,
+        actions: widget.isEditing
+            ? [
+                Container(
+                  margin: const EdgeInsets.only(right: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.edit,
+                        size: 16,
+                        color: Colors.orange.shade700,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Editing Mode',
+                        style: TextStyle(
+                          color: Colors.orange.shade700,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ]
+            : null,
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(isLargeScreen ? 32 : 16),
@@ -467,11 +563,28 @@ class _AddCourseState extends State<AddCourse> {
                 width: 2,
               ),
             ),
-            child: imageHandler.getImagePreview(
-              height: 200,
-              width: double.infinity,
-              borderRadius: BorderRadius.circular(12),
-            ),
+            child: courseimglinkcontroller.text.isNotEmpty
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      courseimglinkcontroller.text,
+                      fit: BoxFit.cover,
+                      height: 200,
+                      width: double.infinity,
+                      errorBuilder: (context, error, stackTrace) {
+                        return imageHandler.getImagePreview(
+                          height: 200,
+                          width: double.infinity,
+                          borderRadius: BorderRadius.circular(12),
+                        );
+                      },
+                    ),
+                  )
+                : imageHandler.getImagePreview(
+                    height: 200,
+                    width: double.infinity,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -498,6 +611,7 @@ class _AddCourseState extends State<AddCourse> {
                         .uploadImageToFirebase('/course_banners');
                     courseimglinkcontroller.text = imageUrl;
                     Utils().toastMessage('Image uploaded successfully!');
+                    setState(() {}); // Update UI to show new image
                   } catch (e) {
                     Utils().toastMessage('Failed to upload image: $e');
                   } finally {
@@ -1152,11 +1266,14 @@ class _AddCourseState extends State<AddCourse> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Review your course details and create',
-                  style: TextStyle(
+                Text(
+                  widget.isEditing
+                      ? 'Review your changes and update the course'
+                      : 'Review your course details and create',
+                  style: const TextStyle(
                     color: Color(0xFF64748B),
                   ),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
                 SizedBox(
@@ -1164,8 +1281,8 @@ class _AddCourseState extends State<AddCourse> {
                   height: 56,
                   child: Roundbuttonnew(
                     loading: loading,
-                    title: 'Create Course',
-                    ontap: _createCourse,
+                    title: widget.isEditing ? 'Update Course' : 'Create Course',
+                    ontap: widget.isEditing ? _updateCourse : _createCourse,
                   ),
                 ),
               ],
@@ -1291,6 +1408,14 @@ class _AddCourseState extends State<AddCourse> {
   }
 
   void _createCourse() async {
+    await _saveCourse(isUpdate: false);
+  }
+
+  void _updateCourse() async {
+    await _saveCourse(isUpdate: true);
+  }
+
+  Future<void> _saveCourse({required bool isUpdate}) async {
     // Validate required fields
     if (coursenamecontroller.text.isEmpty ||
         coursediscriptioncontroller.text.isEmpty ||
@@ -1311,7 +1436,10 @@ class _AddCourseState extends State<AddCourse> {
       loading = true;
     });
 
-    String id = coursenamecontroller.text.toString();
+    String courseId =
+        isUpdate ? widget.courseDoc!.id : coursenamecontroller.text.toString();
+    String newCourseName = coursenamecontroller.text.toString();
+
     try {
       // Prepare teachers data structure
       List<Map<String, dynamic>> teachersData = selectedTeachers
@@ -1328,8 +1456,8 @@ class _AddCourseState extends State<AddCourse> {
           )
           .toList();
 
-      await fireStore.doc(id).set({
-        'Course Name': coursenamecontroller.text.toString(),
+      Map<String, dynamic> courseData = {
+        'Course Name': newCourseName,
         'Course Discription': coursediscriptioncontroller.text.toString(),
         'Course Price': coursepricecontroller.text,
         'Course Img Link': courseimglinkcontroller.text.toString(),
@@ -1344,45 +1472,46 @@ class _AddCourseState extends State<AddCourse> {
         'Prerequisites': prerequisitesController.text,
         'Is Featured': isFeaturesCourse,
         'Teachers': teachersData,
-        'Created At': FieldValue.serverTimestamp(),
-
-        // Add new dynamic content fields
         'LearningObjectives': learningObjectives,
         'FeatureCards': featureCards,
         'KeyDocuments': keyDocuments,
+      };
 
-        // Add PDF documents
-        if (previewVideoController.text.isNotEmpty)
-          'PreviewVideo': previewVideoController.text,
-        if (previewPdfController.text.isNotEmpty)
-          'PreviewPDF': previewPdfController.text,
-        if (syllabusPdfController.text.isNotEmpty)
-          'SyllabusPDF': syllabusPdfController.text,
-        if (schedulePdfController.text.isNotEmpty)
-          'SchedulePDF': schedulePdfController.text,
-      });
+      // Add optional fields
+      if (previewVideoController.text.isNotEmpty)
+        courseData['PreviewVideo'] = previewVideoController.text;
+      if (previewPdfController.text.isNotEmpty)
+        courseData['PreviewPDF'] = previewPdfController.text;
+      if (syllabusPdfController.text.isNotEmpty)
+        courseData['SyllabusPDF'] = syllabusPdfController.text;
+      if (schedulePdfController.text.isNotEmpty)
+        courseData['SchedulePDF'] = schedulePdfController.text;
 
-      // Also add the course to each teacher's My Courses list
-      for (var teacher in selectedTeachers) {
-        final teacherRef = FirebaseFirestore.instance
-            .collection('Users')
-            .doc('teacher')
-            .collection('accounts')
-            .where('Email', isEqualTo: teacher['Email'])
-            .limit(1);
+      if (isUpdate) {
+        // Update existing course
+        courseData['Updated At'] = FieldValue.serverTimestamp();
+        await fireStore.doc(courseId).update(courseData);
 
-        final teacherDocs = await teacherRef.get();
-        if (teacherDocs.docs.isNotEmpty) {
-          final teacherDoc = teacherDocs.docs.first;
-          List<dynamic> currentCourses = teacherDoc.data()['My Courses'] ?? [];
-          if (!currentCourses.contains(coursenamecontroller.text.toString())) {
-            currentCourses.add(coursenamecontroller.text.toString());
-            await teacherDoc.reference.update({'My Courses': currentCourses});
-          }
+        // Handle course name change
+        if (originalCourseName != null && originalCourseName != newCourseName) {
+          await _handleCourseNameChange(
+              originalCourseName!, newCourseName, teachersData);
+        } else {
+          // Update teachers' course lists if teachers changed
+          await _updateTeachersCourses(newCourseName, teachersData);
         }
-      }
 
-      Utils().toastMessage('Course Created Successfully');
+        Utils().toastMessage('Course Updated Successfully');
+      } else {
+        // Create new course
+        courseData['Created At'] = FieldValue.serverTimestamp();
+        await fireStore.doc(courseId).set(courseData);
+
+        // Add course to teachers' lists
+        await _updateTeachersCourses(newCourseName, teachersData);
+
+        Utils().toastMessage('Course Created Successfully');
+      }
 
       if (widget.onCourseAdded != null) {
         widget.onCourseAdded!();
@@ -1396,5 +1525,109 @@ class _AddCourseState extends State<AddCourse> {
         loading = false;
       });
     }
+  }
+
+  Future<void> _handleCourseNameChange(String oldName, String newName,
+      List<Map<String, dynamic>> newTeachers) async {
+    // Update all user enrollments
+    final userTypes = ['student', 'teacher', 'parent'];
+    for (String userType in userTypes) {
+      final usersQuery = await FirebaseFirestore.instance
+          .collection('Users')
+          .doc(userType)
+          .collection('accounts')
+          .get();
+
+      for (var userDoc in usersQuery.docs) {
+        Map<String, dynamic> userData = userDoc.data();
+        if (userData.containsKey(oldName)) {
+          // Copy old course data to new name
+          final courseData = userData[oldName];
+          await userDoc.reference.update({
+            newName: courseData,
+            oldName: FieldValue.delete(),
+          });
+        }
+      }
+    }
+
+    // Update teachers' course lists
+    await _updateTeachersCourses(newName, newTeachers);
+
+    // Remove old course name from previous teachers who are no longer assigned
+    final oldCourseDoc = await fireStore.doc(widget.courseDoc!.id).get();
+    if (oldCourseDoc.exists) {
+      final oldData = oldCourseDoc.data() as Map<String, dynamic>;
+      List<dynamic> oldTeachers = oldData['Teachers'] ?? [];
+
+      for (var oldTeacher in oldTeachers) {
+        bool stillAssigned = newTeachers
+            .any((newTeacher) => newTeacher['Email'] == oldTeacher['Email']);
+
+        if (!stillAssigned) {
+          final teacherQuery = await FirebaseFirestore.instance
+              .collection('Users')
+              .doc('teacher')
+              .collection('accounts')
+              .where('Email', isEqualTo: oldTeacher['Email'])
+              .limit(1)
+              .get();
+
+          if (teacherQuery.docs.isNotEmpty) {
+            final teacherDoc = teacherQuery.docs.first;
+            List<dynamic> currentCourses =
+                teacherDoc.data()['My Courses'] ?? [];
+            currentCourses.remove(oldName);
+            await teacherDoc.reference.update({'My Courses': currentCourses});
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> _updateTeachersCourses(
+      String courseName, List<Map<String, dynamic>> teachers) async {
+    for (var teacher in teachers) {
+      final teacherQuery = await FirebaseFirestore.instance
+          .collection('Users')
+          .doc('teacher')
+          .collection('accounts')
+          .where('Email', isEqualTo: teacher['Email'])
+          .limit(1)
+          .get();
+
+      if (teacherQuery.docs.isNotEmpty) {
+        final teacherDoc = teacherQuery.docs.first;
+        List<dynamic> currentCourses = teacherDoc.data()['My Courses'] ?? [];
+        if (!currentCourses.contains(courseName)) {
+          currentCourses.add(courseName);
+          await teacherDoc.reference.update({'My Courses': currentCourses});
+        }
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    // Dispose all controllers
+    coursediscriptioncontroller.dispose();
+    coursenamecontroller.dispose();
+    coursepricecontroller.dispose();
+    courseimglinkcontroller.dispose();
+    discountPercentageController.dispose();
+    durationController.dispose();
+    prerequisitesController.dispose();
+    difficultyController.dispose();
+    previewPdfController.dispose();
+    previewVideoController.dispose();
+    syllabusPdfController.dispose();
+    schedulePdfController.dispose();
+    _objectiveController.dispose();
+    _featureTitleController.dispose();
+    _featureDescController.dispose();
+    _documentTitleController.dispose();
+    _documentDescController.dispose();
+    _documentUrlController.dispose();
+    super.dispose();
   }
 }

@@ -14,12 +14,9 @@ import 'package:luyip_website_edu/helpers/colors.dart';
 import 'package:luyip_website_edu/helpers/coming_soon.dart';
 import 'package:luyip_website_edu/helpers/video_helper.dart';
 import 'package:luyip_website_edu/home/admin_dashboard.dart';
-
 import 'package:luyip_website_edu/home/student_dashboard.dart';
-
 import 'package:luyip_website_edu/student_dashboard/student_dashboard.dart';
 import 'package:luyip_website_edu/teacher/teacherdashboard.dart';
-
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -96,9 +93,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     User? currentUser = _auth.currentUser;
 
     if (currentUser != null) {
-      // User is signed in, now determine their role
       try {
-        // Check each role collection to find the user
         for (String role in ['student', 'teacher', 'franchise', 'admin']) {
           DocumentSnapshot userDoc = await _firestore
               .collection('Users')
@@ -115,8 +110,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
             return;
           }
         }
-
-        // If no role found, sign out
         await _auth.signOut();
         setState(() {
           isLoading = false;
@@ -129,7 +122,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
         });
       }
     } else {
-      // No user is signed in
       setState(() {
         isLoading = false;
       });
@@ -158,10 +150,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
     final User? user = _auth.currentUser;
 
     if (user == null) {
-      return const HomePage(); // Show homepage with login/register option
+      return const HomePage();
     }
 
-    // User is logged in, redirect based on role
     switch (userRole) {
       case 'student':
         return const StudentDashboardContainer();
@@ -198,6 +189,9 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> courses = [];
   List<Map<String, dynamic>> upcomingEvents = [];
 
+  // Website content data
+  Map<String, dynamic> websiteContent = {};
+
   @override
   void initState() {
     super.initState();
@@ -226,51 +220,31 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _fetchHomePageData() async {
     try {
-      // Fetch website general data (banners, announcements)
       final websiteDoc =
           await _firestore.collection('website_general').doc('dashboard').get();
 
       if (websiteDoc.exists) {
         final data = websiteDoc.data() as Map<String, dynamic>;
 
-        // Get banners
-        if (data.containsKey('banners')) {
-          setState(() {
-            banners = List<Map<String, dynamic>>.from(data['banners'] ?? []);
-          });
-        } else {
-          // Use default banners if none are configured
-          _setDefaultBanners();
-        }
+        setState(() {
+          banners = List<Map<String, dynamic>>.from(data['banners'] ?? []);
+          announcements =
+              List<Map<String, dynamic>>.from(data['announcements'] ?? []);
+          testimonials =
+              List<Map<String, dynamic>>.from(data['testimonials'] ?? []);
+          upcomingEvents =
+              List<Map<String, dynamic>>.from(data['upcomingEvents'] ?? []);
+          websiteContent =
+              Map<String, dynamic>.from(data['websiteContent'] ?? {});
+        });
 
-        // Get announcements
-        if (data.containsKey('announcements')) {
-          setState(() {
-            announcements =
-                List<Map<String, dynamic>>.from(data['announcements'] ?? []);
-          });
-        }
-
-        // Get testimonials
-        if (data.containsKey('testimonials')) {
-          setState(() {
-            testimonials =
-                List<Map<String, dynamic>>.from(data['testimonials'] ?? []);
-          });
-        }
-
-        // Get upcoming events
-        if (data.containsKey('upcomingEvents')) {
-          setState(() {
-            upcomingEvents =
-                List<Map<String, dynamic>>.from(data['upcomingEvents'] ?? []);
-          });
-        }
+        if (banners.isEmpty) _setDefaultBanners();
+        if (websiteContent.isEmpty) _setDefaultWebsiteContent();
       } else {
         _setDefaultBanners();
+        _setDefaultWebsiteContent();
       }
 
-      // Fetch platform stats
       final statsDoc =
           await _firestore.collection('website_general').doc('stats').get();
 
@@ -282,12 +256,11 @@ class _HomePageState extends State<HomePage> {
       } else {
         _setDefaultStats();
       }
-
-      // Fetch featured courses
     } catch (e) {
       print('Error fetching homepage data: $e');
       _setDefaultBanners();
       _setDefaultStats();
+      _setDefaultWebsiteContent();
     } finally {
       setState(() {
         isLoading = false;
@@ -295,7 +268,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Default data setting methods remain the same
   void _setDefaultBanners() {
     setState(() {
       banners = [
@@ -354,10 +326,44 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  void _setDefaultWebsiteContent() {
+    setState(() {
+      websiteContent = {
+        'logoUrl': '',
+        'companyName': 'Luiyp Education',
+        'companyShortName': 'LE',
+        'heroTitle': 'Building Futures Through Quality Education',
+        'heroSubtitle':
+            'Luiyp Education aims to transform education in India by providing affordable and quality learning opportunities for all.',
+        'bharatLine1': "Bharat's ",
+        'bharatLine2': "Trusted & Affordable",
+        'bharatLine3': "Educational Platform",
+        'statsTitle': 'Our Impact in Numbers',
+        'statsSubtitle':
+            'Join millions of students who have already transformed their educational journey with Luiyp Education',
+        'coursesTitle': 'Featured Courses',
+        'coursesSubtitle':
+            'Explore our top-rated courses designed to help you achieve academic excellence',
+        'getStartedTitle': 'Ready to Transform Your Learning Journey?',
+        'getStartedSubtitle':
+            'Join Luiyp Education today and experience the best in educational content, expert guidance, and comprehensive exam preparation.',
+        'getStartedButton1': 'Get Started',
+        'getStartedButton2': 'Contact Us',
+        'footerDescription':
+            'Luiyp Education is India\'s leading educational platform dedicated to providing affordable and quality education to students across the country.',
+        'footerEmail': 'support@luiypedu.com',
+        'footerPhone': '+91 1234567890',
+        'copyrightText': 'Luiyp Education. All rights reserved.',
+        'loadingText': 'Loading your educational journey...',
+        'contactNumber': '+911234567890',
+      };
+    });
+  }
+
   Color _getColorFromString(String colorName) {
     switch (colorName.toLowerCase()) {
       case 'purple':
-        return const Color(0xFF5E4DCD); // Primary brand color
+        return const Color(0xFF5E4DCD);
       case 'blue':
         return Colors.blue.shade600;
       case 'green':
@@ -367,8 +373,12 @@ class _HomePageState extends State<HomePage> {
       case 'pink':
         return Colors.pink.shade600;
       default:
-        return const Color(0xFF5E4DCD); // Default to primary
+        return const Color(0xFF5E4DCD);
     }
+  }
+
+  String _getWebsiteContent(String key, String defaultValue) {
+    return websiteContent[key]?.toString() ?? defaultValue;
   }
 
   @override
@@ -378,83 +388,84 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _getWebsiteContent('logoUrl', '').isNotEmpty
+                      ? Image.network(
+                          _getWebsiteContent('logoUrl', ''),
+                          width: 120,
+                          height: 120,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Image.asset('assets/images/logo.png',
+                                  width: 120, height: 120),
+                        )
+                      : Image.asset('assets/images/logo.png',
+                          width: 120, height: 120),
+                  const SizedBox(height: 24),
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(_getWebsiteContent(
+                      'loadingText', 'Loading your educational journey...')),
+                ],
+              ),
+            )
           : Stack(
               children: [
-                // Main content with scroll
                 SafeArea(
                   child: CustomScrollView(
                     controller: _scrollController,
-                    physics:
-                        const AlwaysScrollableScrollPhysics(), // Ensure scrolling always works
+                    physics: const AlwaysScrollableScrollPhysics(),
                     slivers: [
-                      // Top Navigation Bar padding for fixed navbar
                       SliverToBoxAdapter(
                         child: SizedBox(
-                            height: isMobile
-                                ? 80
-                                : (isScrolled
-                                    ? 70
-                                    : 0)), // Increased mobile height
+                            height: isMobile ? 80 : (isScrolled ? 70 : 0)),
                       ),
-
-                      // Hero Banner with dynamic content
                       SliverToBoxAdapter(
                         child: HeroBanner(
                           banners: banners,
                           getColorFromString: _getColorFromString,
+                          websiteContent: websiteContent,
                         ),
                       ),
-
-                      // Platform Stats Section with dynamic content
                       SliverToBoxAdapter(
                         child: PlatformStatsSection(
                           stats: stats,
                           getColorFromString: _getColorFromString,
+                          websiteContent: websiteContent,
                         ),
                       ),
-
-                      // Featured Courses Section
                       SliverToBoxAdapter(
                         child: FeaturedCoursesSection(
                           getColorFromString: _getColorFromString,
+                          websiteContent: websiteContent,
                         ),
                       ),
-
-                      // Announcements Section (if there are any)
                       if (announcements.isNotEmpty)
                         SliverToBoxAdapter(
                           child:
                               AnnouncementsBanner(announcements: announcements),
                         ),
-
-                      // Testimonials Section (if there are any)
                       if (testimonials.isNotEmpty)
                         SliverToBoxAdapter(
                           child:
                               TestimonialsSection(testimonials: testimonials),
                         ),
-
-                      // Upcoming Events Section (if there are any)
                       if (upcomingEvents.isNotEmpty)
                         SliverToBoxAdapter(
                           child: UpcomingEventsSection(events: upcomingEvents),
                         ),
-
-                      // Get Started Section
                       SliverToBoxAdapter(
-                        child: GetStartedSection(),
+                        child:
+                            GetStartedSection(websiteContent: websiteContent),
                       ),
-
-                      // Footer
                       SliverToBoxAdapter(
-                        child: Footer(),
+                        child: Footer(websiteContent: websiteContent),
                       ),
                     ],
                   ),
                 ),
-
-                // Fixed position navbar that changes with scroll
                 Positioned(
                   top: 0,
                   left: 0,
@@ -466,18 +477,20 @@ class _HomePageState extends State<HomePage> {
                         : Colors.transparent,
                     padding: EdgeInsets.symmetric(
                         horizontal: 20, vertical: isScrolled ? 8 : 10),
-                    child: NavBar(isScrolled: isScrolled),
+                    child: NavBar(
+                        isScrolled: isScrolled, websiteContent: websiteContent),
                   ),
                 ),
               ],
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          final Uri phoneUri = Uri(scheme: 'tel', path: '+911234567890');
+          final Uri phoneUri = Uri(
+              scheme: 'tel',
+              path: _getWebsiteContent('contactNumber', '+911234567890'));
           if (await canLaunchUrl(phoneUri)) {
             await launchUrl(phoneUri);
           } else {
-            // Contact functionality fallback
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                   content: Text('Contact support feature coming soon!')),
@@ -493,10 +506,12 @@ class _HomePageState extends State<HomePage> {
 
 class NavBar extends StatefulWidget {
   final bool isScrolled;
+  final Map<String, dynamic> websiteContent;
 
   const NavBar({
     Key? key,
     this.isScrolled = false,
+    required this.websiteContent, // ADD THIS PARAMETER
   }) : super(key: key);
 
   @override
@@ -505,6 +520,9 @@ class NavBar extends StatefulWidget {
 
 class _NavBarState extends State<NavBar> {
   bool _showMenu = false;
+  String _getWebsiteContent(String key, String defaultValue) {
+    return widget.websiteContent[key]?.toString() ?? defaultValue;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -531,120 +549,125 @@ class _NavBarState extends State<NavBar> {
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Logo
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF5E4DCD),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'LE',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+              // Logo section
+              _getWebsiteContent('logoUrl', '').isNotEmpty
+                  ? Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Image.network(
+                        _getWebsiteContent('logoUrl', ''),
+                        width: 30,
+                        height: 30,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF5E4DCD),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _getWebsiteContent('companyShortName', 'LE'),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF5E4DCD),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _getWebsiteContent('companyShortName', 'LE'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Luiyp Education',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 8),
+              Text(
+                _getWebsiteContent('companyName', 'Luiyp Education'),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
               ),
 
-              // Menu Items - Responsive
-              if (!isMobile)
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildNavigationItem('Home', () {
-                        // Stay on homepage
-                      }),
-                      _buildNavigationItem('Courses', () {
-                        // Navigate to courses screen
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) =>
-                                  AllCoursesScreen(userType: 'student')),
-                        );
-                      }),
-                      _buildNavigationItem('Franchise', () {
-                        // Navigate to franchise info screen
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LoginScreen(
-                              userRole: 'franchise',
-                            ),
-                          ),
-                        );
-                      }),
-                      _buildNavigationItem('Teacher', () {
-                        // Navigate to teacher info screen
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LoginScreen(
-                              userRole: 'teacher',
-                            ),
-                          ),
-                        );
-                      }),
-                      _buildNavigationItem('Verify Certificate', () {
-                        // Navigate to certificate verification screen
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const ComingSoonScreen(
-                                  pageName: 'Page not found')),
-                        );
-                      }),
-                      _buildNavigationItem('About Us', () {
-                        // Navigate to about screen
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('About Us section coming soon!')),
-                        );
-                      }),
-                      _buildNavigationItem('Contact', () {
-                        // Navigate to contact screen
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content:
-                                  Text('Contact information coming soon!')),
-                        );
-                      }),
-                    ],
-                  ),
-                )
-              else
-                // On mobile, show a menu button
-                IconButton(
-                  icon: Icon(
-                    _showMenu ? Icons.close : Icons.menu,
-                    size: 28,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _showMenu = !_showMenu;
-                    });
-                  },
-                ),
+              // Spacer to push menu items to center and login button to right
+              const Spacer(),
 
-              // Login/Register Button
-              if (!isMobile)
+              // Menu Items - Desktop only
+              if (!isMobile) ...[
+                _buildNavigationItem('Home', () {
+                  // Stay on homepage
+                }),
+                _buildNavigationItem('Courses', () {
+                  // Navigate to courses screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) =>
+                            AllCoursesScreen(userType: 'student')),
+                  );
+                }),
+                _buildNavigationItem('Franchise', () {
+                  // Navigate to franchise info screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LoginScreen(
+                        userRole: 'franchise',
+                      ),
+                    ),
+                  );
+                }),
+                _buildNavigationItem('Teacher', () {
+                  // Navigate to teacher info screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LoginScreen(
+                        userRole: 'teacher',
+                      ),
+                    ),
+                  );
+                }),
+                _buildNavigationItem('Verify Certificate', () {
+                  // Navigate to certificate verification screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) =>
+                            const ComingSoonScreen(pageName: 'Page not found')),
+                  );
+                }),
+                _buildNavigationItem('About Us', () {
+                  // Navigate to about screen
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('About Us section coming soon!')),
+                  );
+                }),
+                _buildNavigationItem('Contact', () {
+                  // Navigate to contact screen
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Contact information coming soon!')),
+                  );
+                }),
+
+                const Spacer(),
+
+                // Login/Register Button - Desktop
                 ElevatedButton(
                   onPressed: () {
                     Navigator.push(
@@ -668,6 +691,19 @@ class _NavBarState extends State<NavBar> {
                     'Login/Register',
                     style: TextStyle(color: Colors.white),
                   ),
+                ),
+              ] else
+                // Mobile menu button
+                IconButton(
+                  icon: Icon(
+                    _showMenu ? Icons.close : Icons.menu,
+                    size: 28,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _showMenu = !_showMenu;
+                    });
+                  },
                 ),
             ],
           ),
@@ -704,9 +740,8 @@ class _NavBarState extends State<NavBar> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const Placeholder(
-                          child: Center(child: Text('All Courses Screen')),
-                        ),
+                        builder: (context) =>
+                            AllCoursesScreen(userType: 'student'),
                       ),
                     );
                   }),
@@ -744,8 +779,8 @@ class _NavBarState extends State<NavBar> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const LoginScreen(
-                          userRole: '',
+                        builder: (context) => const ComingSoonScreen(
+                          pageName: 'Certificate Verification',
                         ),
                       ),
                     );
@@ -773,6 +808,9 @@ class _NavBarState extends State<NavBar> {
                     padding: const EdgeInsets.all(12.0),
                     child: ElevatedButton(
                       onPressed: () {
+                        setState(() {
+                          _showMenu = false;
+                        });
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -840,12 +878,17 @@ class _NavBarState extends State<NavBar> {
 class HeroBanner extends StatelessWidget {
   final List<Map<String, dynamic>> banners;
   final Color Function(String) getColorFromString;
+  final Map<String, dynamic> websiteContent;
 
   const HeroBanner({
     Key? key,
     required this.banners,
     required this.getColorFromString,
+    required this.websiteContent, // ADD THIS
   }) : super(key: key);
+  String _getWebsiteContent(String key, String defaultValue) {
+    return websiteContent[key]?.toString() ?? defaultValue;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -879,17 +922,16 @@ class HeroBanner extends StatelessWidget {
                   : 800, // Full width minus padding on mobile
             ),
             child: Text(
-              'Building Futures Through Quality Education',
+              _getWebsiteContent(
+                  'heroTitle', 'Building Futures Through Quality Education'),
               style: TextStyle(
-                fontSize: isMobile
-                    ? 24
-                    : 42, // Slightly smaller on mobile but still visible
+                fontSize: isMobile ? 24 : 42,
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
-                height: isMobile ? 1.3 : 1.2, // Better line height for mobile
+                height: isMobile ? 1.3 : 1.2,
               ),
               textAlign: TextAlign.center,
-              maxLines: isMobile ? 3 : 2, // Allow more lines on mobile
+              maxLines: isMobile ? 3 : 2,
             ),
           ),
 
@@ -901,14 +943,15 @@ class HeroBanner extends StatelessWidget {
               maxWidth: isMobile ? screenSize.width - 40 : 700,
             ),
             child: Text(
-              'Luiyp Education aims to transform education in India by providing affordable and quality learning opportunities for all.',
+              _getWebsiteContent('heroSubtitle',
+                  'Luiyp Education aims to transform education in India by providing affordable and quality learning opportunities for all.'),
               style: TextStyle(
                 fontSize: isMobile ? 14 : 18,
                 color: Colors.black54,
                 height: 1.5,
               ),
               textAlign: TextAlign.center,
-              maxLines: isMobile ? 4 : 3, // Allow more lines on mobile
+              maxLines: isMobile ? 4 : 3,
             ),
           ),
 
@@ -930,9 +973,9 @@ class HeroBanner extends StatelessWidget {
               children: [
                 // First line
                 Text(
-                  "Bharat's ",
+                  _getWebsiteContent('bharatLine1', "Bharat's "),
                   style: TextStyle(
-                    fontSize: isMobile ? 20 : 42, // Much smaller on mobile
+                    fontSize: isMobile ? 20 : 42,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
                   ),
@@ -940,17 +983,17 @@ class HeroBanner extends StatelessWidget {
                 ),
                 // Second line
                 Text(
-                  "Trusted & Affordable",
+                  _getWebsiteContent('bharatLine2', "Trusted & Affordable"),
                   style: TextStyle(
                     fontSize: isMobile ? 20 : 42,
                     fontWeight: FontWeight.bold,
-                    color: ColorManager.primary, // Using consistent color
+                    color: ColorManager.primary,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 // Third line
                 Text(
-                  "Educational Platform",
+                  _getWebsiteContent('bharatLine3', "Educational Platform"),
                   style: TextStyle(
                     fontSize: isMobile ? 20 : 42,
                     fontWeight: FontWeight.bold,
@@ -1531,12 +1574,19 @@ class AnnouncementsBanner extends StatelessWidget {
 class PlatformStatsSection extends StatelessWidget {
   final List<Map<String, dynamic>> stats;
   final Color Function(String) getColorFromString;
+  final Map<String, dynamic> websiteContent;
 
   const PlatformStatsSection({
     Key? key,
     required this.stats,
     required this.getColorFromString,
+    required this.websiteContent, // ADD THIS
   }) : super(key: key);
+
+  // ADD THIS METHOD:
+  String _getWebsiteContent(String key, String defaultValue) {
+    return websiteContent[key]?.toString() ?? defaultValue;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1561,7 +1611,7 @@ class PlatformStatsSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
-            'Our Impact in Numbers',
+            _getWebsiteContent('statsTitle', 'Our Impact in Numbers'),
             style: TextStyle(
               fontSize: isMobile ? 24 : 32,
               fontWeight: FontWeight.bold,
@@ -1573,7 +1623,8 @@ class PlatformStatsSection extends StatelessWidget {
           Container(
             constraints: const BoxConstraints(maxWidth: 700),
             child: Text(
-              'Join millions of students who have already transformed their educational journey with Luiyp Education',
+              _getWebsiteContent('statsSubtitle',
+                  'Join millions of students who have already transformed their educational journey with Luiyp Education'),
               style: TextStyle(
                 fontSize: isMobile ? 14 : 16,
                 color: Colors.black54,
@@ -1681,10 +1732,12 @@ class PlatformStatsSection extends StatelessWidget {
 
 class FeaturedCoursesSection extends StatefulWidget {
   final Color Function(String) getColorFromString;
+  final Map<String, dynamic> websiteContent;
 
   const FeaturedCoursesSection({
     Key? key,
     required this.getColorFromString,
+    required this.websiteContent, // ADD THIS
   }) : super(key: key);
 
   @override
@@ -1692,6 +1745,10 @@ class FeaturedCoursesSection extends StatefulWidget {
 }
 
 class _FeaturedCoursesSectionState extends State<FeaturedCoursesSection> {
+  String _getWebsiteContent(String key, String defaultValue) {
+    return widget.websiteContent[key]?.toString() ?? defaultValue;
+  }
+
   bool isLoading = true;
   List<Map<String, dynamic>> courses = [];
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -1766,7 +1823,7 @@ class _FeaturedCoursesSectionState extends State<FeaturedCoursesSection> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
-            'Featured Courses',
+            _getWebsiteContent('coursesTitle', 'Featured Courses'),
             style: TextStyle(
               fontSize: isMobile ? 24 : 32,
               fontWeight: FontWeight.bold,
@@ -1778,7 +1835,8 @@ class _FeaturedCoursesSectionState extends State<FeaturedCoursesSection> {
           Container(
             constraints: const BoxConstraints(maxWidth: 700),
             child: Text(
-              'Explore our top-rated courses designed to help you achieve academic excellence',
+              _getWebsiteContent('coursesSubtitle',
+                  'Explore our top-rated courses designed to help you achieve academic excellence'),
               style: TextStyle(
                 fontSize: isMobile ? 14 : 16,
                 color: Colors.black54,
@@ -2872,12 +2930,19 @@ Color _getCategoryColor(String category) {
 }
 
 class GetStartedSection extends StatelessWidget {
-  const GetStartedSection({Key? key}) : super(key: key);
+  final Map<String, dynamic> websiteContent;
+  const GetStartedSection({
+    Key? key,
+    required this.websiteContent, // ADD THIS
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final Size screenSize = MediaQuery.of(context).size;
     final bool isMobile = screenSize.width < 800;
+    String _getWebsiteContent(String key, String defaultValue) {
+      return websiteContent[key]?.toString() ?? defaultValue;
+    }
 
     return Container(
       width: double.infinity,
@@ -2978,9 +3043,17 @@ class GetStartedSection extends StatelessWidget {
 }
 
 class Footer extends StatelessWidget {
-  const Footer({Key? key}) : super(key: key);
+  final Map<String, dynamic> websiteContent;
+  const Footer({
+    Key? key,
+    required this.websiteContent, // ADD THIS
+  }) : super(key: key);
 
   // Navigation helper method
+  String _getWebsiteContent(String key, String defaultValue) {
+    return websiteContent[key]?.toString() ?? defaultValue;
+  }
+
   void _navigateToPage(BuildContext context, String pageName) {
     Widget targetPage;
 

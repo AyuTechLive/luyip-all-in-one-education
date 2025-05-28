@@ -8,6 +8,7 @@ import 'package:luyip_website_edu/Courses/course_details/course_details.dart';
 import 'package:luyip_website_edu/Courses/widget/coursecardview.dart';
 import 'package:luyip_website_edu/helpers/userauthtype.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
+import 'package:luyip_website_edu/helpers/utils.dart';
 
 class AllCoursesScreen extends StatefulWidget {
   final String userType;
@@ -145,6 +146,239 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
     );
   }
 
+  void _showCourseActionsDialog(DocumentSnapshot doc) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Manage Course',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  doc['Course Name'].toString(),
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey.shade600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Edit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _editCourse(doc);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.delete),
+                        label: const Text('Delete'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _showDeleteConfirmationDialog(doc);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _editCourse(DocumentSnapshot doc) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddCourse(
+          onCourseAdded: _refreshCourses,
+          courseDoc: doc, // Pass the document for editing
+          isEditing: true,
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmationDialog(DocumentSnapshot doc) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Delete Course',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Are you sure you want to delete this course?'),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning, color: Colors.red.shade600, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        doc['Course Name'].toString(),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'This action cannot be undone. All course data, enrollments, and progress will be permanently deleted.',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteCourse(doc);
+              },
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteCourse(DocumentSnapshot doc) async {
+    setState(() {
+      loading = true;
+    });
+
+    try {
+      String courseName = doc['Course Name'].toString();
+
+      // Delete the course document
+      await FirebaseFirestore.instance
+          .collection('All Courses')
+          .doc(doc.id)
+          .delete();
+
+      // Remove course from all teachers' "My Courses" lists
+      List<dynamic> teachers = doc['Teachers'] ?? [];
+      for (var teacher in teachers) {
+        final teacherEmail = teacher['Email'];
+        final teacherQuery = await FirebaseFirestore.instance
+            .collection('Users')
+            .doc('teacher')
+            .collection('accounts')
+            .where('Email', isEqualTo: teacherEmail)
+            .limit(1)
+            .get();
+
+        if (teacherQuery.docs.isNotEmpty) {
+          final teacherDoc = teacherQuery.docs.first;
+          List<dynamic> currentCourses = teacherDoc.data()['My Courses'] ?? [];
+          currentCourses.remove(courseName);
+          await teacherDoc.reference.update({'My Courses': currentCourses});
+        }
+      }
+
+      // Remove course enrollments from all users
+      final userTypes = ['student', 'teacher', 'parent'];
+      for (String userType in userTypes) {
+        final usersQuery = await FirebaseFirestore.instance
+            .collection('Users')
+            .doc(userType)
+            .collection('accounts')
+            .get();
+
+        for (var userDoc in usersQuery.docs) {
+          Map<String, dynamic> userData = userDoc.data();
+          if (userData.containsKey(courseName)) {
+            await userDoc.reference.update({
+              courseName: FieldValue.delete(),
+            });
+          }
+        }
+      }
+
+      Utils().toastMessage('Course deleted successfully');
+      _refreshCourses();
+    } catch (error) {
+      Utils().toastMessage('Error deleting course: ${error.toString()}');
+    } finally {
+      setState(() {
+        loading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     SystemChrome.setEnabledSystemUIMode(
@@ -251,7 +485,34 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
                   ),
                 ),
                 const Spacer(),
-                // Could add filter/sort options here
+                if (isAdmin)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: ColorManager.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.admin_panel_settings,
+                          size: 16,
+                          color: ColorManager.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Admin Mode',
+                          style: TextStyle(
+                            color: ColorManager.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
@@ -392,33 +653,96 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
                         itemCount: filteredDocs.length,
                         itemBuilder: (context, index) {
                           final doc = filteredDocs[index];
-                          return Coursecardview(
-                            loading: loading,
-                            courseName: doc['Course Name'].toString(),
-                            coursePrice: doc['Course Price'].toString(),
-                            courseImgLink: doc['Course Img Link'].toString(),
-                            courseDiscription:
-                                doc['Course Discription'].toString(),
-                            ontap: () {
-                              setState(() {
-                                loading = true;
-                              });
+                          return Stack(
+                            children: [
+                              Coursecardview(
+                                loading: loading,
+                                courseName: doc['Course Name'].toString(),
+                                coursePrice: doc['Course Price'].toString(),
+                                courseImgLink:
+                                    doc['Course Img Link'].toString(),
+                                courseDiscription:
+                                    doc['Course Discription'].toString(),
+                                ontap: () {
+                                  setState(() {
+                                    loading = true;
+                                  });
 
-                              searchAndCreateCourse1(
-                                doc['Course Name'].toString(),
-                                doc['Course Price'].toString(),
-                                doc['Course Img Link'].toString(),
-                                doc['Course Discription'].toString(),
-                              ).then((value) {
-                                setState(() {
-                                  loading = false;
-                                });
-                              }).onError((error, stackTrace) {
-                                setState(() {
-                                  loading = false;
-                                });
-                              });
-                            },
+                                  searchAndCreateCourse1(
+                                    doc['Course Name'].toString(),
+                                    doc['Course Price'].toString(),
+                                    doc['Course Img Link'].toString(),
+                                    doc['Course Discription'].toString(),
+                                  ).then((value) {
+                                    setState(() {
+                                      loading = false;
+                                    });
+                                  }).onError((error, stackTrace) {
+                                    setState(() {
+                                      loading = false;
+                                    });
+                                  });
+                                },
+                              ),
+                              // Admin action buttons
+                              if (isAdmin)
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.1),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: PopupMenuButton<String>(
+                                      icon: Icon(
+                                        Icons.more_vert,
+                                        color: Colors.grey.shade700,
+                                        size: 20,
+                                      ),
+                                      padding: EdgeInsets.zero,
+                                      onSelected: (value) {
+                                        if (value == 'edit') {
+                                          _editCourse(doc);
+                                        } else if (value == 'delete') {
+                                          _showDeleteConfirmationDialog(doc);
+                                        }
+                                      },
+                                      itemBuilder: (BuildContext context) => [
+                                        const PopupMenuItem<String>(
+                                          value: 'edit',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.edit,
+                                                  color: Colors.blue, size: 18),
+                                              SizedBox(width: 8),
+                                              Text('Edit Course'),
+                                            ],
+                                          ),
+                                        ),
+                                        const PopupMenuItem<String>(
+                                          value: 'delete',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.delete,
+                                                  color: Colors.red, size: 18),
+                                              SizedBox(width: 8),
+                                              Text('Delete Course'),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
                           );
                         },
                       );
