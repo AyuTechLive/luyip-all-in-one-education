@@ -77,10 +77,71 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
+  // Convert Firebase errors to user-friendly messages
+  String _getErrorMessage(String errorCode) {
+    switch (errorCode) {
+      case 'weak-password':
+        return 'Password is too weak. Please choose a stronger password with at least 6 characters.';
+      case 'email-already-in-use':
+        return 'An account with this email already exists. Please try logging in instead.';
+      case 'invalid-email':
+        return 'Please enter a valid email address.';
+      case 'operation-not-allowed':
+        return 'Account creation is currently disabled. Please contact support.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please try again later.';
+      case 'network-request-failed':
+        return 'Network error. Please check your internet connection and try again.';
+      case 'user-disabled':
+        return 'This account has been disabled. Please contact support.';
+      case 'requires-recent-login':
+        return 'Please log in again to continue.';
+      case 'credential-already-in-use':
+        return 'This credential is already associated with another account.';
+      case 'invalid-credential':
+        return 'Invalid credentials provided. Please try again.';
+      case 'account-exists-with-different-credential':
+        return 'An account with this email already exists with different credentials.';
+      case 'permission-denied':
+        return 'Permission denied. Please check your account permissions.';
+      case 'unavailable':
+        return 'Service temporarily unavailable. Please try again later.';
+      case 'deadline-exceeded':
+        return 'Request timeout. Please try again.';
+      case 'already-exists':
+        return 'User data already exists. Please try logging in instead.';
+      case 'failed-precondition':
+        return 'System requirements not met. Please try again.';
+      case 'out-of-range':
+        return 'Invalid data provided. Please check your information.';
+      case 'unimplemented':
+        return 'Feature not available. Please contact support.';
+      case 'internal':
+        return 'Internal error occurred. Please try again later.';
+      case 'cancelled':
+        return 'Operation was cancelled. Please try again.';
+      case 'data-loss':
+        return 'Data error occurred. Please try again.';
+      case 'unauthenticated':
+        return 'Authentication failed. Please try again.';
+      case 'resource-exhausted':
+        return 'Service quota exceeded. Please try again later.';
+      case 'invalid-argument':
+        return 'Invalid information provided. Please check your details.';
+      case 'not-found':
+        return 'Requested resource not found.';
+      case 'aborted':
+        return 'Operation was aborted. Please try again.';
+      default:
+        return 'An unexpected error occurred. Please try again or contact support if the problem persists.';
+    }
+  }
+
   Future<void> signUp() async {
     if (_formfield.currentState!.validate()) {
       if (!_acceptedTerms) {
-        Utils().toastMessage('Please accept the terms and conditions');
+        Utils()
+            .toastMessage('Please accept the terms and conditions to continue');
         return;
       }
 
@@ -124,7 +185,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
             .set(userData);
 
         // Login after successful signup
-        Utils().toastMessage('Account Successfully Created');
+        Utils().toastMessage(
+            'Welcome to LUIYP Education! Your account has been successfully created.');
         setState(() {
           loading = false;
         });
@@ -134,11 +196,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
           context,
           MaterialPageRoute(builder: (context) => MainPage(role: selectedRole)),
         );
+      } on FirebaseAuthException catch (e) {
+        setState(() {
+          loading = false;
+        });
+        String userFriendlyMessage = _getErrorMessage(e.code);
+        Utils().toastMessage(userFriendlyMessage);
+      } on FirebaseException catch (e) {
+        setState(() {
+          loading = false;
+        });
+        String userFriendlyMessage = _getErrorMessage(e.code);
+        Utils().toastMessage(userFriendlyMessage);
       } catch (error) {
         setState(() {
           loading = false;
         });
-        Utils().toastMessage(error.toString());
+        // Handle any other unexpected errors
+        Utils().toastMessage(
+            'Something went wrong. Please check your internet connection and try again.');
       }
     }
   }
@@ -555,6 +631,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   if (value!.isEmpty) {
                     return 'Please enter your name';
                   }
+                  if (value.trim().length < 2) {
+                    return 'Name must be at least 2 characters long';
+                  }
                   return null;
                 },
               ),
@@ -590,7 +669,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     return 'Please enter your phone number';
                   }
                   if (value.length < 10) {
-                    return 'Please enter a valid phone number';
+                    return 'Please enter a valid phone number (at least 10 digits)';
                   }
                   return null;
                 },
@@ -637,6 +716,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey.shade300),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.red.shade400),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.red.shade400, width: 2),
+        ),
         filled: true,
         fillColor: Colors.grey.shade50,
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
@@ -651,7 +738,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       obscureText: !_isPasswordVisible,
       decoration: InputDecoration(
         labelText: 'Password',
-        hintText: 'Create a strong password',
+        hintText: 'Create a strong password (minimum 6 characters)',
         prefixIcon: Icon(Icons.lock_outline, color: ColorManager.primary),
         suffixIcon: IconButton(
           icon: Icon(
@@ -675,6 +762,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey.shade300),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.red.shade400),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.red.shade400, width: 2),
+        ),
         filled: true,
         fillColor: Colors.grey.shade50,
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
@@ -684,7 +779,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
           return 'Please enter a password';
         }
         if (value.length < 6) {
-          return 'Password must be at least 6 characters';
+          return 'Password must be at least 6 characters long';
+        }
+        if (!RegExp(r'^(?=.*[a-zA-Z])').hasMatch(value)) {
+          return 'Password must contain at least one letter';
         }
         return null;
       },

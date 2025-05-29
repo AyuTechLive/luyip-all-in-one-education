@@ -583,7 +583,7 @@ class CertificateGenerator {
     try {
       // Create verification URL with certificate number pointing to your actual website
       final verificationUrl =
-          'https://education-all-in-one.web.app/#/verify?cert=$certificateNumber';
+          'https://luiypeducation.com/#/verify?cert=$certificateNumber';
 
       print('Generating QR code for URL: $verificationUrl'); // Debug log
 
@@ -644,7 +644,7 @@ class CertificateGenerator {
       ..style = ui.PaintingStyle.fill;
 
     final verificationData =
-        'https://education-all-in-one.web.app/#/verify?cert=$certificateNumber';
+        'https://luiypeducation.com/#/verify?cert=$certificateNumber';
     final hash = verificationData.hashCode;
 
     // Create a pattern based on verification data
@@ -769,7 +769,7 @@ class CertificateGenerator {
                 ),
                 pw.SizedBox(height: 4),
                 pw.Text(
-                  'Verify at: education-all-in-one.web.app/verify', // Updated URL
+                  'Verify at: https://luiypeducation.com/#/verify', // Updated URL
                   style: pw.TextStyle(
                     font: bodyFont,
                     fontSize: 7,

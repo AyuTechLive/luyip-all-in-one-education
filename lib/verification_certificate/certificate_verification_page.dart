@@ -280,7 +280,7 @@ class _CertificateVerificationPageState
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Official verification system for https://education-all-in-one.web.app/',
+                    'Official verification system for https://luiypeducation.com/',
                     style: TextStyle(
                       fontSize: isSmallScreen ? 10 : 12,
                       color: ColorManager.success,

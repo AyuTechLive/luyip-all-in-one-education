@@ -212,53 +212,54 @@ class _CourseDetailsState extends State<CourseDetails> {
           );
         },
       ),
-      floatingActionButton: _isEnrolled || _isProcessingPayment
-          ? null
-          : AnimatedOpacity(
-              opacity: _isScrolled ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 300),
-              child: FutureBuilder<DocumentSnapshot>(
-                future: _courseFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting ||
-                      !snapshot.hasData ||
-                      !snapshot.data!.exists) {
-                    return Container();
-                  }
+      floatingActionButton:
+          _isEnrolled || _isProcessingPayment || widget.userRole == 'franchise'
+              ? null
+              : AnimatedOpacity(
+                  opacity: _isScrolled ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: FutureBuilder<DocumentSnapshot>(
+                    future: _courseFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting ||
+                          !snapshot.hasData ||
+                          !snapshot.data!.exists) {
+                        return Container();
+                      }
 
-                  var data = snapshot.data!.data() as Map<String, dynamic>;
-                  String priceStr = data['Course Price'] ?? 'FREE';
-                  double price = 0.0;
-                  if (priceStr.toLowerCase() != 'free') {
-                    price = double.tryParse(
-                          priceStr.replaceAll(RegExp(r'[^\d.]'), ''),
-                        ) ??
-                        0.0;
-                  }
+                      var data = snapshot.data!.data() as Map<String, dynamic>;
+                      String priceStr = data['Course Price'] ?? 'FREE';
+                      double price = 0.0;
+                      if (priceStr.toLowerCase() != 'free') {
+                        price = double.tryParse(
+                              priceStr.replaceAll(RegExp(r'[^\d.]'), ''),
+                            ) ??
+                            0.0;
+                      }
 
-                  double finalPrice = _isMember && _discountPercentage > 0
-                      ? _discountedPrice
-                      : price;
-                  String buttonText = price > 0
-                      ? finalPrice < price
-                          ? 'PAY ₹${finalPrice.toStringAsFixed(0)} & ENROLL'
-                          : 'PAY & ENROLL'
-                      : 'ENROLL NOW';
+                      double finalPrice = _isMember && _discountPercentage > 0
+                          ? _discountedPrice
+                          : price;
+                      String buttonText = price > 0
+                          ? finalPrice < price
+                              ? 'PAY ₹${finalPrice.toStringAsFixed(0)} & ENROLL'
+                              : 'PAY & ENROLL'
+                          : 'ENROLL NOW';
 
-                  return FloatingActionButton.extended(
-                    onPressed: () => _handleEnrollment(price),
-                    backgroundColor: ColorManager.primary,
-                    label: Text(
-                      buttonText,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    icon: price > 0
-                        ? const Icon(Icons.payment)
-                        : const Icon(Icons.school),
-                  );
-                },
-              ),
-            ),
+                      return FloatingActionButton.extended(
+                        onPressed: () => _handleEnrollment(price),
+                        backgroundColor: ColorManager.primary,
+                        label: Text(
+                          buttonText,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        icon: price > 0
+                            ? const Icon(Icons.payment)
+                            : const Icon(Icons.school),
+                      );
+                    },
+                  ),
+                ),
     );
   }
 
@@ -291,16 +292,18 @@ class _CourseDetailsState extends State<CourseDetails> {
               const SizedBox(height: 24),
               CourseDetailSections.buildFeatureCards(featureCards),
               const SizedBox(height: 40),
-              CourseDetailSections.buildEnrollSection(
-                size,
-                price,
-                _isEnrolled,
-                _isProcessingPayment,
-                _isMember,
-                _discountPercentage,
-                _discountedPrice,
-                _handleEnrollment,
-              ),
+              // Hide enrollment section for franchise users
+              if (widget.userRole != 'franchise')
+                CourseDetailSections.buildEnrollSection(
+                  size,
+                  price,
+                  _isEnrolled,
+                  _isProcessingPayment,
+                  _isMember,
+                  _discountPercentage,
+                  _discountedPrice,
+                  _handleEnrollment,
+                ),
             ],
           ),
         );
@@ -323,6 +326,7 @@ class _CourseDetailsState extends State<CourseDetails> {
             keyDocuments,
             _isEnrolled,
             widget.coursename,
+            widget.userRole, // Pass userRole here
             context,
           ),
         );

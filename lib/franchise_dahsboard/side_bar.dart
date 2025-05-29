@@ -96,7 +96,7 @@ class _FranchiseDashboardSidebarState extends State<FranchiseDashboardSidebar> {
         child: Column(
           children: [
             const SizedBox(height: 20),
-            // Logo area with gradient background
+            // Logo header with dynamic logo from Firebase
             Container(
               padding: const EdgeInsets.symmetric(vertical: 24),
               margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -107,19 +107,69 @@ class _FranchiseDashboardSidebarState extends State<FranchiseDashboardSidebar> {
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(10),
+                boxShadow: [],
               ),
-              child: const Center(
-                child: Text(
-                  "FRANCHISE PORTAL",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                    letterSpacing: 1.5,
-                  ),
-                ),
+              child: FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance
+                    .collection('website_general')
+                    .doc('dashboard')
+                    .get(),
+                builder: (context, snapshot) {
+                  String logoUrl = '';
+                  String companyName = 'LUIYP';
+
+                  if (snapshot.hasData && snapshot.data!.exists) {
+                    final data = snapshot.data!.data() as Map<String, dynamic>?;
+                    final websiteContent =
+                        data?['websiteContent'] as Map<String, dynamic>? ?? {};
+                    logoUrl = websiteContent['logoUrl']?.toString() ?? '';
+                    companyName = websiteContent['companyName']?.toString() ??
+                        websiteContent['companyShortName']?.toString() ??
+                        'LUIYP';
+                  }
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (logoUrl.isNotEmpty)
+                        Image.network(
+                          logoUrl,
+                          width: 40,
+                          height: 40,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const SizedBox.shrink();
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return const SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            );
+                          },
+                        ),
+                      if (logoUrl.isNotEmpty) const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          companyName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            letterSpacing: 1.2,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
+
             const SizedBox(height: 30),
 
             // Franchise profile section
@@ -220,12 +270,6 @@ class _FranchiseDashboardSidebarState extends State<FranchiseDashboardSidebar> {
                     ),
                     _buildSidebarItem(
                       context,
-                      Icons.business_outlined,
-                      'Franchise Centers',
-                      isActive: widget.selectedPage == 'Franchise Centers',
-                    ),
-                    _buildSidebarItem(
-                      context,
                       Icons.school_outlined,
                       'Teachers',
                       isActive: widget.selectedPage == 'Teachers',
@@ -272,31 +316,6 @@ class _FranchiseDashboardSidebarState extends State<FranchiseDashboardSidebar> {
                           ),
                         ),
                       ),
-                    ),
-
-                    _buildSidebarItem(
-                      context,
-                      Icons.assessment_outlined,
-                      'Reports',
-                      isActive: widget.selectedPage == 'Reports',
-                    ),
-                    _buildSidebarItem(
-                      context,
-                      Icons.trending_up_outlined,
-                      'Revenue',
-                      isActive: widget.selectedPage == 'Revenue',
-                    ),
-                    _buildSidebarItem(
-                      context,
-                      Icons.campaign_outlined,
-                      'Marketing',
-                      isActive: widget.selectedPage == 'Marketing',
-                    ),
-                    _buildSidebarItem(
-                      context,
-                      Icons.analytics_outlined,
-                      'Analytics',
-                      isActive: widget.selectedPage == 'Analytics',
                     ),
 
                     const SizedBox(height: 16),

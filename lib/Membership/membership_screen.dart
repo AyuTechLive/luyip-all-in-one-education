@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:luyip_website_edu/student_dashboard/membership_card.dart';
 import 'package:razorpay_web/razorpay_web.dart';
@@ -27,12 +28,39 @@ class _MembershipScreenState extends State<MembershipScreen> {
   DateTime? _startDate;
   bool _isProcessingPayment = false;
   late Razorpay _razorpay;
+  double _membershipFee = 1000.0;
 
   @override
   void initState() {
     super.initState();
     _initializeRazorpay();
     _loadMembershipStatus();
+    _loadMembershipFee();
+  }
+
+  Future<void> _loadMembershipFee() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('website_general')
+          .doc('dashboard')
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        final websiteContent = data['websiteContent'] as Map<String, dynamic>?;
+
+        if (websiteContent != null &&
+            websiteContent.containsKey('membershipFee')) {
+          setState(() {
+            _membershipFee =
+                (websiteContent['membershipFee'] as num?)?.toDouble() ?? 1000.0;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading membership fee: $e');
+      // Keep default value of 1000.0
+    }
   }
 
   void _initializeRazorpay() {
@@ -104,10 +132,9 @@ class _MembershipScreenState extends State<MembershipScreen> {
     });
 
     try {
-      // Use the new transaction service to activate membership
       bool success = await _transactionService.activateMembership(
         transactionId: response.paymentId!,
-        amount: 1000.0, // Annual membership fee (₹1000)
+        amount: _membershipFee, // Use dynamic fee instead of hardcoded 1000.0
         currency: 'INR',
       );
 
@@ -322,7 +349,7 @@ class _MembershipScreenState extends State<MembershipScreen> {
                             ),
                           ),
                           Text(
-                            '1,000',
+                            _membershipFee.toStringAsFixed(0),
                             style: TextStyle(
                               fontSize: 36,
                               fontWeight: FontWeight.bold,
@@ -557,7 +584,7 @@ class _MembershipScreenState extends State<MembershipScreen> {
                     Text(
                       _isMember
                           ? 'View ID Card'
-                          : 'Join Membership (₹1,000/year)',
+                          : 'Join Membership (₹${_membershipFee.toStringAsFixed(0)}/year)',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

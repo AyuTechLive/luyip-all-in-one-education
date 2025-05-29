@@ -69,9 +69,11 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
+        automaticallyImplyLeading: false,
         title: Text(
           'Teacher Dashboard - $_currentPage',
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style:
+              const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
         ),
         backgroundColor: const Color(0xFF5E4DCD),
         actions: [

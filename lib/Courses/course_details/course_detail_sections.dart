@@ -1376,6 +1376,7 @@ class CourseDetailSections {
       List<dynamic> keyDocuments,
       bool isEnrolled,
       String courseName,
+      String userRole, // Add userRole parameter
       BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1387,7 +1388,8 @@ class CourseDetailSections {
         Container(
           margin: const EdgeInsets.only(bottom: 24),
           child: InkWell(
-            onTap: isEnrolled
+            onTap: (isEnrolled ||
+                    userRole == 'franchise') // Allow franchise access
                 ? () {
                     Navigator.push(
                       context,
@@ -1402,7 +1404,7 @@ class CourseDetailSections {
             child: Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                gradient: isEnrolled
+                gradient: (isEnrolled || userRole == 'franchise')
                     ? LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -1422,7 +1424,7 @@ class CourseDetailSections {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: isEnrolled
+                    color: (isEnrolled || userRole == 'franchise')
                         ? ColorManager.primary.withOpacity(0.3)
                         : Colors.grey.withOpacity(0.2),
                     blurRadius: 15,
@@ -1439,7 +1441,9 @@ class CourseDetailSections {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Icon(
-                      isEnrolled ? Icons.library_books : Icons.lock,
+                      (isEnrolled || userRole == 'franchise')
+                          ? Icons.library_books
+                          : Icons.lock,
                       color: Colors.white,
                       size: 32,
                     ),
@@ -1450,7 +1454,7 @@ class CourseDetailSections {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isEnrolled
+                          (isEnrolled || userRole == 'franchise')
                               ? 'Browse All Subjects'
                               : 'Enroll to Access Materials',
                           style: const TextStyle(
@@ -1461,7 +1465,7 @@ class CourseDetailSections {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          isEnrolled
+                          (isEnrolled || userRole == 'franchise')
                               ? 'Access all course subjects and study materials'
                               : 'Complete enrollment to unlock all course content',
                           style: TextStyle(
@@ -1473,7 +1477,7 @@ class CourseDetailSections {
                       ],
                     ),
                   ),
-                  if (isEnrolled)
+                  if (isEnrolled || userRole == 'franchise')
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(

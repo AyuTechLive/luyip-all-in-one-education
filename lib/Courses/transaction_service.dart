@@ -52,6 +52,7 @@ class TransactionService {
     required String courseName,
     required String currency,
     String? franchiseName,
+    String? franchiseEmail,
     double? franchiseCommission,
   }) async {
     Map<String, dynamic> courseData = {
@@ -63,6 +64,9 @@ class TransactionService {
     if (franchiseName != null) {
       courseData['franchiseName'] = franchiseName;
       courseData['addedByFranchise'] = true;
+      if (franchiseEmail != null) {
+        courseData['franchiseEmail'] = franchiseEmail;
+      }
       if (franchiseCommission != null) {
         courseData['franchiseCommission'] = franchiseCommission;
       }
@@ -86,6 +90,7 @@ class TransactionService {
     required DateTime startDate,
     required DateTime expiryDate,
     String? franchiseName,
+    String? franchiseEmail,
     double? franchiseCommission,
   }) async {
     Map<String, dynamic> membershipData = {
@@ -98,6 +103,9 @@ class TransactionService {
     if (franchiseName != null) {
       membershipData['franchiseName'] = franchiseName;
       membershipData['addedByFranchise'] = true;
+      if (franchiseEmail != null) {
+        membershipData['franchiseEmail'] = franchiseEmail;
+      }
       if (franchiseCommission != null) {
         membershipData['franchiseCommission'] = franchiseCommission;
       }
@@ -116,6 +124,7 @@ class TransactionService {
   Future<void> recordFranchiseCommission({
     required String transactionId,
     required String franchiseName,
+    required String franchiseEmail,
     required double commissionAmount,
     required double originalAmount,
     required double commissionPercentage,
@@ -127,6 +136,7 @@ class TransactionService {
       Map<String, dynamic> commissionData = {
         'transactionId': transactionId,
         'franchiseName': franchiseName,
+        'franchiseEmail': franchiseEmail,
         'commissionAmount': commissionAmount,
         'originalAmount': originalAmount,
         'commissionPercentage': commissionPercentage,
@@ -177,6 +187,7 @@ class TransactionService {
     required String courseName,
     required String currency,
     String? franchiseName,
+    String? franchiseEmail,
     double? franchiseCommission,
   }) async {
     try {
@@ -187,6 +198,7 @@ class TransactionService {
         courseName: courseName,
         currency: currency,
         franchiseName: franchiseName,
+        franchiseEmail: franchiseEmail,
         franchiseCommission: franchiseCommission,
       );
 
@@ -194,10 +206,13 @@ class TransactionService {
       await enrollUserInCourse(courseName);
 
       // Record franchise commission if applicable
-      if (franchiseName != null && franchiseCommission != null) {
+      if (franchiseName != null &&
+          franchiseEmail != null &&
+          franchiseCommission != null) {
         await recordFranchiseCommission(
           transactionId: transactionId,
           franchiseName: franchiseName,
+          franchiseEmail: franchiseEmail,
           commissionAmount: franchiseCommission,
           originalAmount: amount + franchiseCommission,
           commissionPercentage:
@@ -220,6 +235,7 @@ class TransactionService {
     required double amount,
     required String currency,
     String? franchiseName,
+    String? franchiseEmail,
     double? franchiseCommission,
   }) async {
     try {
@@ -245,6 +261,7 @@ class TransactionService {
         startDate: startDate,
         expiryDate: expiryDate,
         franchiseName: franchiseName,
+        franchiseEmail: franchiseEmail,
         franchiseCommission: franchiseCommission,
       );
 
@@ -261,6 +278,9 @@ class TransactionService {
       if (franchiseName != null) {
         membershipData['addedByFranchise'] = true;
         membershipData['franchiseName'] = franchiseName;
+        if (franchiseEmail != null) {
+          membershipData['franchiseEmail'] = franchiseEmail;
+        }
       }
 
       await _firestore
@@ -273,10 +293,13 @@ class TransactionService {
       });
 
       // Record franchise commission if applicable
-      if (franchiseName != null && franchiseCommission != null) {
+      if (franchiseName != null &&
+          franchiseEmail != null &&
+          franchiseCommission != null) {
         await recordFranchiseCommission(
           transactionId: transactionId,
           franchiseName: franchiseName,
+          franchiseEmail: franchiseEmail,
           commissionAmount: franchiseCommission,
           originalAmount: amount + franchiseCommission,
           commissionPercentage:
@@ -298,6 +321,7 @@ class TransactionService {
     required String studentEmail,
     required String transactionId,
     required String franchiseName,
+    required String franchiseEmail,
     required double membershipFee,
     required double franchiseCommission,
   }) async {
@@ -322,6 +346,7 @@ class TransactionService {
         startDate: startDate,
         expiryDate: expiryDate,
         franchiseName: franchiseName,
+        franchiseEmail: franchiseEmail,
         franchiseCommission: franchiseCommission,
       );
 
@@ -340,6 +365,7 @@ class TransactionService {
           'transactionId': transactionId,
           'addedByFranchise': true,
           'franchiseName': franchiseName,
+          'franchiseEmail': franchiseEmail,
         }
       });
 
@@ -347,6 +373,7 @@ class TransactionService {
       await recordFranchiseCommission(
         transactionId: transactionId,
         franchiseName: franchiseName,
+        franchiseEmail: franchiseEmail,
         commissionAmount: franchiseCommission,
         originalAmount: membershipFee,
         commissionPercentage: (franchiseCommission / membershipFee) * 100,
@@ -425,6 +452,24 @@ class TransactionService {
     }
   }
 
+  // Get franchise commissions by email
+  Future<List<Map<String, dynamic>>> getFranchiseCommissionsByEmail(
+      String franchiseEmail) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('FranchiseCommissions')
+          .where('franchiseEmail', isEqualTo: franchiseEmail)
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      return querySnapshot.docs
+          .map((doc) => doc.data() as Map<String, dynamic>)
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to fetch franchise commissions: $e');
+    }
+  }
+
   // Get franchise commission summary
   Future<Map<String, dynamic>> getFranchiseCommissionSummary(
       String franchiseName) async {
@@ -432,6 +477,42 @@ class TransactionService {
       final querySnapshot = await _firestore
           .collection('FranchiseCommissions')
           .where('franchiseName', isEqualTo: franchiseName)
+          .where('status', isEqualTo: 'earned')
+          .get();
+
+      double totalCommission = 0;
+      int membershipCommissions = 0;
+      int courseCommissions = 0;
+
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data();
+        totalCommission += (data['commissionAmount'] as num).toDouble();
+
+        if (data['type'] == 'membership') {
+          membershipCommissions++;
+        } else if (data['type'] == 'course') {
+          courseCommissions++;
+        }
+      }
+
+      return {
+        'totalCommission': totalCommission,
+        'totalTransactions': querySnapshot.docs.length,
+        'membershipCommissions': membershipCommissions,
+        'courseCommissions': courseCommissions,
+      };
+    } catch (e) {
+      throw Exception('Failed to fetch commission summary: $e');
+    }
+  }
+
+  // Get franchise commission summary by email
+  Future<Map<String, dynamic>> getFranchiseCommissionSummaryByEmail(
+      String franchiseEmail) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('FranchiseCommissions')
+          .where('franchiseEmail', isEqualTo: franchiseEmail)
           .where('status', isEqualTo: 'earned')
           .get();
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'package:luyip_website_edu/helpers/colors.dart';
 import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/add_franchise.dart';
+import 'package:luyip_website_edu/Courses/transaction_service.dart';
 
 class FranchisesContent extends StatefulWidget {
   const FranchisesContent({Key? key}) : super(key: key);
@@ -12,6 +14,8 @@ class FranchisesContent extends StatefulWidget {
 
 class _FranchisesContentState extends State<FranchisesContent> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final TransactionService _transactionService = TransactionService();
+
   String _searchQuery = '';
   String _selectedStatus = 'All';
   String _selectedCategory = 'All';
@@ -25,135 +29,289 @@ class _FranchisesContentState extends State<FranchisesContent> {
     'Platinum'
   ];
 
+  // Cache for franchise revenue data
+  Map<String, Map<String, dynamic>> _franchiseRevenueCache = {};
+  bool _isLoadingRevenue = false;
+  Set<String> _loadingFranchises =
+      {}; // Track which franchises are being loaded
+  Set<String> _processedFranchisesList =
+      {}; // Track processed franchise lists to prevent duplicate loading
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
   void _refreshPage() {
-    setState(() {});
+    setState(() {
+      _franchiseRevenueCache.clear(); // Clear cache on refresh
+      _loadingFranchises.clear(); // Clear loading set
+      _processedFranchisesList.clear(); // Clear processed lists
+    });
+  }
+
+  // Fetch revenue data for a specific franchise
+  Future<Map<String, dynamic>> _getFranchiseRevenueData(
+      String franchiseEmail) async {
+    // Check cache first
+    if (_franchiseRevenueCache.containsKey(franchiseEmail)) {
+      return _franchiseRevenueCache[franchiseEmail]!;
+    }
+
+    // Check if already loading
+    if (_loadingFranchises.contains(franchiseEmail)) {
+      // Wait a bit and check cache again
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (_franchiseRevenueCache.containsKey(franchiseEmail)) {
+        return _franchiseRevenueCache[franchiseEmail]!;
+      }
+    }
+
+    // Mark as loading
+    _loadingFranchises.add(franchiseEmail);
+
+    try {
+      // Get commission summary from TransactionService
+      Map<String, dynamic> commissionSummary = await _transactionService
+          .getFranchiseCommissionSummaryByEmail(franchiseEmail);
+
+      // Get all commissions to calculate monthly revenue
+      List<Map<String, dynamic>> allCommissions = await _transactionService
+          .getFranchiseCommissionsByEmail(franchiseEmail);
+
+      // Calculate current month revenue
+      DateTime now = DateTime.now();
+      String currentMonthKey =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+      double currentMonthRevenue = 0.0;
+      int totalStudents = 0;
+
+      for (var commission in allCommissions) {
+        // Count students (only membership commissions count as students)
+        if (commission['type'] == 'membership') {
+          totalStudents++;
+        }
+
+        // Calculate current month revenue
+        if (commission['timestamp'] != null) {
+          try {
+            DateTime commissionDate =
+                (commission['timestamp'] as Timestamp).toDate();
+            String commissionMonthKey =
+                '${commissionDate.year}-${commissionDate.month.toString().padLeft(2, '0')}';
+
+            if (commissionMonthKey == currentMonthKey) {
+              currentMonthRevenue +=
+                  (commission['commissionAmount'] as num?)?.toDouble() ?? 0.0;
+            }
+          } catch (e) {
+            print('Error processing commission timestamp: $e');
+            // Skip this commission if timestamp is invalid
+          }
+        }
+      }
+
+      Map<String, dynamic> revenueData = {
+        'totalRevenue': commissionSummary['totalCommission'] ?? 0.0,
+        'monthlyRevenue': currentMonthRevenue,
+        'totalStudents': totalStudents,
+        'totalTransactions': commissionSummary['totalTransactions'] ?? 0,
+        'membershipCommissions':
+            commissionSummary['membershipCommissions'] ?? 0,
+        'courseCommissions': commissionSummary['courseCommissions'] ?? 0,
+      };
+
+      // Cache the result
+      _franchiseRevenueCache[franchiseEmail] = revenueData;
+
+      return revenueData;
+    } catch (e) {
+      print('Error fetching revenue for $franchiseEmail: $e');
+      // Return default values on error
+      Map<String, dynamic> defaultData = {
+        'totalRevenue': 0.0,
+        'monthlyRevenue': 0.0,
+        'totalStudents': 0,
+        'totalTransactions': 0,
+        'membershipCommissions': 0,
+        'courseCommissions': 0,
+      };
+
+      _franchiseRevenueCache[franchiseEmail] = defaultData;
+      return defaultData;
+    } finally {
+      // Remove from loading set
+      _loadingFranchises.remove(franchiseEmail);
+    }
+  }
+
+  // Bulk load revenue data for all visible franchises
+  Future<void> _loadRevenueDataForFranchises(
+      List<String> franchiseEmails) async {
+    if (_isLoadingRevenue) return;
+
+    setState(() {
+      _isLoadingRevenue = true;
+    });
+
+    try {
+      // Load revenue data for franchises not in cache and not currently loading
+      List<Future<void>> futures = [];
+
+      for (String email in franchiseEmails) {
+        if (!_franchiseRevenueCache.containsKey(email) &&
+            !_loadingFranchises.contains(email) &&
+            email.isNotEmpty) {
+          futures.add(_getFranchiseRevenueData(email).then((_) {}));
+        }
+      }
+
+      if (futures.isNotEmpty) {
+        await Future.wait(futures);
+      }
+
+      if (mounted) {
+        setState(() {
+          _isLoadingRevenue = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading bulk revenue data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingRevenue = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header section
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Franchise Management',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: ColorManager.textDark,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header section
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Franchise Management',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: ColorManager.textDark,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Manage your franchise partners and their performance',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: ColorManager.textMedium,
+                      ),
+                    ),
+                  ],
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AddFranchisePage(
+                          onFranchiseAdded: _refreshPage,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Franchise'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ColorManager.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 2,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Manage your franchise partners and their details',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: ColorManager.textMedium,
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // Filters and search section
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      onChanged: (value) =>
+                          setState(() => _searchQuery = value),
+                      decoration: InputDecoration(
+                        hintText: 'Search franchises...',
+                        prefixIcon:
+                            Icon(Icons.search, color: ColorManager.primary),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: ColorManager.primary),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildFilterDropdown(
+                      'Status',
+                      _selectedStatus,
+                      _statusFilters,
+                      (value) => setState(() => _selectedStatus = value!),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildFilterDropdown(
+                      'Category',
+                      _selectedCategory,
+                      _categoryFilters,
+                      (value) => setState(() => _selectedCategory = value!),
                     ),
                   ),
                 ],
               ),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AddFranchisePage(
-                        onFranchiseAdded: _refreshPage,
-                      ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.add),
-                label: const Text('Add Franchise'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: ColorManager.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 2,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // Filters and search section
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: TextField(
-                    onChanged: (value) => setState(() => _searchQuery = value),
-                    decoration: InputDecoration(
-                      hintText: 'Search franchises...',
-                      prefixIcon:
-                          Icon(Icons.search, color: ColorManager.primary),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: ColorManager.primary),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildFilterDropdown(
-                    'Status',
-                    _selectedStatus,
-                    _statusFilters,
-                    (value) => setState(() => _selectedStatus = value!),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildFilterDropdown(
-                    'Category',
-                    _selectedCategory,
-                    _categoryFilters,
-                    (value) => setState(() => _selectedCategory = value!),
-                  ),
-                ),
-              ],
-            ),
-          ),
 
-          const SizedBox(height: 24),
+            const SizedBox(height: 24),
 
-          // Franchises list
-          Expanded(
-            child: Container(
+            // Franchises list container
+            Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
@@ -173,73 +331,82 @@ class _FranchisesContentState extends State<FranchisesContent> {
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return Container(
+                      height: 400,
+                      child: const Center(child: CircularProgressIndicator()),
+                    );
                   }
 
                   if (snapshot.hasError) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.error_outline,
-                              color: Colors.red, size: 60),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Error loading franchises',
-                            style: TextStyle(color: Colors.red, fontSize: 16),
-                          ),
-                        ],
+                    return Container(
+                      height: 400,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline,
+                                color: Colors.red, size: 60),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Error loading franchises',
+                              style: TextStyle(color: Colors.red, fontSize: 16),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   }
 
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.store_outlined,
-                            color: ColorManager.textLight,
-                            size: 80,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No franchises found',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: ColorManager.textMedium,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Add your first franchise to get started',
-                            style: TextStyle(
-                              fontSize: 16,
+                    return Container(
+                      height: 400,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.store_outlined,
                               color: ColorManager.textLight,
+                              size: 80,
                             ),
-                          ),
-                          const SizedBox(height: 24),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => AddFranchisePage(
-                                    onFranchiseAdded: _refreshPage,
+                            const SizedBox(height: 16),
+                            Text(
+                              'No franchises found',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: ColorManager.textMedium,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Add your first franchise to get started',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: ColorManager.textLight,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => AddFranchisePage(
+                                      onFranchiseAdded: _refreshPage,
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.add),
-                            label: const Text('Add First Franchise'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: ColorManager.primary,
-                              foregroundColor: Colors.white,
+                                );
+                              },
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add First Franchise'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: ColorManager.primary,
+                                foregroundColor: Colors.white,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     );
                   }
@@ -291,7 +458,30 @@ class _FranchisesContentState extends State<FranchisesContent> {
                     return true;
                   }).toList();
 
+                  // Load revenue data for visible franchises
+                  List<String> franchiseEmails = filteredFranchises
+                      .map((doc) {
+                        Map<String, dynamic> data =
+                            doc.data() as Map<String, dynamic>;
+                        return data['Email'] as String? ?? '';
+                      })
+                      .where((email) => email.isNotEmpty)
+                      .toList();
+
+                  // Create a unique key for this franchise list
+                  String franchiseListKey = franchiseEmails.join(',');
+
+                  // Load revenue data only if this list hasn't been processed
+                  if (!_processedFranchisesList.contains(franchiseListKey)) {
+                    _processedFranchisesList.add(franchiseListKey);
+                    // Use Future.microtask instead of addPostFrameCallback to prevent flickering
+                    Future.microtask(
+                        () => _loadRevenueDataForFranchises(franchiseEmails));
+                  }
+
                   return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       // Header
                       Container(
@@ -315,23 +505,42 @@ class _FranchisesContentState extends State<FranchisesContent> {
                                 color: ColorManager.textDark,
                               ),
                             ),
+                            if (_isLoadingRevenue) ...[
+                              const SizedBox(width: 16),
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Loading revenue data...',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: ColorManager.textMedium,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
 
-                      // Franchises list
-                      Expanded(
-                        child: ListView.separated(
-                          padding: const EdgeInsets.all(20),
-                          itemCount: filteredFranchises.length,
-                          separatorBuilder: (context, index) =>
-                              const Divider(height: 24),
-                          itemBuilder: (context, index) {
-                            Map<String, dynamic> data =
-                                filteredFranchises[index].data()
-                                    as Map<String, dynamic>;
-                            return _buildFranchiseCard(data);
-                          },
+                      // Franchises list - Remove ListView and use Column instead
+                      Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          children: [
+                            for (int index = 0;
+                                index < filteredFranchises.length;
+                                index++) ...[
+                              _buildFranchiseCard(filteredFranchises[index]
+                                  .data() as Map<String, dynamic>),
+                              if (index < filteredFranchises.length - 1)
+                                const SizedBox(
+                                    height: 24), // Space between cards
+                            ],
+                          ],
                         ),
                       ),
                     ],
@@ -339,8 +548,11 @@ class _FranchisesContentState extends State<FranchisesContent> {
                 },
               ),
             ),
-          ),
-        ],
+
+            // Add some bottom padding for better UX
+            const SizedBox(height: 40),
+          ],
+        ),
       ),
     );
   }
@@ -388,6 +600,21 @@ class _FranchisesContentState extends State<FranchisesContent> {
   }
 
   Widget _buildFranchiseCard(Map<String, dynamic> data) {
+    String franchiseEmail = data['Email'] ?? '';
+    Map<String, dynamic> revenueData = _franchiseRevenueCache[franchiseEmail] ??
+        {
+          'totalRevenue': 0.0,
+          'monthlyRevenue': 0.0,
+          'totalStudents': 0,
+          'totalTransactions': 0,
+          'membershipCommissions': 0,
+          'courseCommissions': 0,
+        };
+
+    bool isLoadingThisRevenue =
+        !_franchiseRevenueCache.containsKey(franchiseEmail) &&
+            franchiseEmail.isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -484,23 +711,37 @@ class _FranchisesContentState extends State<FranchisesContent> {
                         _buildInfoRow(Icons.percent_outlined, 'Commission',
                             '${data['CommissionPercent'] ?? 0}%'),
                         _buildInfoRow(Icons.calendar_today_outlined, 'Joined',
-                            data['DOJ'] ?? 'N/A'),
-                        _buildInfoRow(Icons.people_outlined, 'Students',
-                            '${data['TotalStudents'] ?? 0}'),
+                            _formatDate(data['DOJ'])),
+                        _buildInfoRow(
+                            Icons.people_outlined,
+                            'Students',
+                            isLoadingThisRevenue
+                                ? 'Loading...'
+                                : '${revenueData['totalStudents']}'),
                       ],
                     ),
                     const SizedBox(height: 20),
                     _buildInfoItem(
-                      'Revenue',
+                      'Revenue Performance',
                       [
                         _buildInfoRow(
                             Icons.attach_money_outlined,
-                            'Total Revenue',
-                            '₹${_formatCurrency(data['TotalRevenue'] ?? 0)}'),
+                            'Total Commission',
+                            isLoadingThisRevenue
+                                ? 'Loading...'
+                                : '₹${_formatCurrency(revenueData['totalRevenue'])}'),
                         _buildInfoRow(
                             Icons.trending_up_outlined,
-                            'Monthly Revenue',
-                            '₹${_formatCurrency(data['MonthlyRevenue'] ?? 0)}'),
+                            'This Month',
+                            isLoadingThisRevenue
+                                ? 'Loading...'
+                                : '₹${_formatCurrency(revenueData['monthlyRevenue'])}'),
+                        _buildInfoRow(
+                            Icons.receipt_outlined,
+                            'Transactions',
+                            isLoadingThisRevenue
+                                ? 'Loading...'
+                                : '${revenueData['totalTransactions']}'),
                       ],
                     ),
                   ],
@@ -508,6 +749,39 @@ class _FranchisesContentState extends State<FranchisesContent> {
               ),
             ],
           ),
+
+          // Commission breakdown
+          if (!isLoadingThisRevenue &&
+              (revenueData['membershipCommissions'] > 0 ||
+                  revenueData['courseCommissions'] > 0)) ...[
+            const SizedBox(height: 20),
+            _buildInfoItem(
+              'Commission Breakdown',
+              [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildCommissionChip(
+                        'Memberships',
+                        revenueData['membershipCommissions'].toString(),
+                        Colors.green,
+                        Icons.card_membership,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildCommissionChip(
+                        'Courses',
+                        revenueData['courseCommissions'].toString(),
+                        Colors.blue,
+                        Icons.book,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
 
           // Address section
           if (data['Address'] != null &&
@@ -586,7 +860,7 @@ class _FranchisesContentState extends State<FranchisesContent> {
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _viewFranchiseDetails(data),
+                  onPressed: () => _viewFranchiseDetails(data, revenueData),
                   icon: const Icon(Icons.visibility_outlined),
                   label: const Text('View Details'),
                   style: OutlinedButton.styleFrom(
@@ -613,6 +887,45 @@ class _FranchisesContentState extends State<FranchisesContent> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommissionChip(
+      String label, String value, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 6),
+          Column(
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
@@ -758,6 +1071,50 @@ class _FranchisesContentState extends State<FranchisesContent> {
     }
   }
 
+  String _formatDate(dynamic date) {
+    if (date == null) return 'N/A';
+
+    try {
+      // Handle different date formats
+      if (date is Timestamp) {
+        return DateFormat('dd MMM yyyy').format(date.toDate());
+      } else if (date is DateTime) {
+        return DateFormat('dd MMM yyyy').format(date);
+      } else if (date is String) {
+        // Try to parse common date formats
+        DateTime? parsedDate;
+
+        // Try format: dd-MM-yyyy
+        try {
+          List<String> parts = date.split('-');
+          if (parts.length == 3) {
+            int day = int.parse(parts[0]);
+            int month = int.parse(parts[1]);
+            int year = int.parse(parts[2]);
+            parsedDate = DateTime(year, month, day);
+          }
+        } catch (e) {
+          // Try other formats if needed
+          try {
+            parsedDate = DateTime.parse(date);
+          } catch (e2) {
+            print('Error parsing date string: $date - $e2');
+            return date; // Return original string if can't parse
+          }
+        }
+
+        if (parsedDate != null) {
+          return DateFormat('dd MMM yyyy').format(parsedDate);
+        }
+      }
+
+      return date.toString();
+    } catch (e) {
+      print('Error formatting date: $date - $e');
+      return date?.toString() ?? 'N/A';
+    }
+  }
+
   void _editFranchise(Map<String, dynamic> data) {
     // Navigate to edit franchise page (you can implement this)
     showDialog(
@@ -776,28 +1133,48 @@ class _FranchisesContentState extends State<FranchisesContent> {
     );
   }
 
-  void _viewFranchiseDetails(Map<String, dynamic> data) {
-    // Show detailed view of franchise
+  void _viewFranchiseDetails(
+      Map<String, dynamic> data, Map<String, dynamic> revenueData) {
+    String franchiseEmail = data['Email'] ?? '';
+    bool isLoadingRevenue =
+        !_franchiseRevenueCache.containsKey(franchiseEmail) &&
+            franchiseEmail.isNotEmpty;
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
         child: Container(
-          width: 600,
+          width: 700,
+          constraints: const BoxConstraints(maxHeight: 600),
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Franchise Details',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: ColorManager.textDark,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        data['FranchiseName'] ?? 'Unknown Franchise',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: ColorManager.textDark,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Owner: ${data['Name'] ?? 'Unknown'}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: ColorManager.textMedium,
+                        ),
+                      ),
+                    ],
                   ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
@@ -805,15 +1182,285 @@ class _FranchisesContentState extends State<FranchisesContent> {
                   ),
                 ],
               ),
+
               const SizedBox(height: 20),
-              // Add detailed view content here
-              Text(
-                'Detailed view of ${data['FranchiseName']} can be implemented here.',
-                style: TextStyle(color: ColorManager.textMedium),
+              const Divider(),
+              const SizedBox(height: 20),
+
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Revenue Summary Cards
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildSummaryCard(
+                              'Total Commission',
+                              isLoadingRevenue
+                                  ? 'Loading...'
+                                  : '₹${_formatCurrency(revenueData['totalRevenue'])}',
+                              Icons.account_balance_wallet,
+                              Colors.green,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildSummaryCard(
+                              'Students Added',
+                              isLoadingRevenue
+                                  ? 'Loading...'
+                                  : '${revenueData['totalStudents']}',
+                              Icons.people,
+                              Colors.blue,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildSummaryCard(
+                              'Total Transactions',
+                              isLoadingRevenue
+                                  ? 'Loading...'
+                                  : '${revenueData['totalTransactions']}',
+                              Icons.receipt,
+                              Colors.orange,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Business Information
+                      Text(
+                        'Business Information',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: ColorManager.textDark,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildDetailRow('Email', data['Email'] ?? 'N/A'),
+                            _buildDetailRow('Phone', data['Phone'] ?? 'N/A'),
+                            _buildDetailRow('Commission Rate',
+                                '${data['CommissionPercent'] ?? 0}%'),
+                            _buildDetailRow(
+                                'Category', data['Category'] ?? 'Standard'),
+                            _buildDetailRow(
+                                'Status', data['Status'] ?? 'Unknown'),
+                            _buildDetailRow(
+                                'Date Joined', _formatDate(data['DOJ'])),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Location Information
+                      Text(
+                        'Location Information',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: ColorManager.textDark,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildDetailRow('City', data['City'] ?? 'N/A'),
+                            _buildDetailRow('State', data['State'] ?? 'N/A'),
+                            _buildDetailRow(
+                                'PIN Code', data['PinCode'] ?? 'N/A'),
+                            if (data['Address'] != null &&
+                                data['Address'].toString().isNotEmpty)
+                              _buildDetailRow('Full Address', data['Address']),
+                          ],
+                        ),
+                      ),
+
+                      // Performance Metrics
+                      if (!isLoadingRevenue) ...[
+                        const SizedBox(height: 20),
+                        Text(
+                          'Performance Metrics',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: ColorManager.textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            children: [
+                              _buildDetailRow('This Month Revenue',
+                                  '₹${_formatCurrency(revenueData['monthlyRevenue'])}'),
+                              _buildDetailRow('Membership Commissions',
+                                  '${revenueData['membershipCommissions']}'),
+                              _buildDetailRow('Course Commissions',
+                                  '${revenueData['courseCommissions']}'),
+                              _buildDetailRow(
+                                  'Average per Student',
+                                  revenueData['totalStudents'] > 0
+                                      ? '₹${_formatCurrency(revenueData['totalRevenue'] / revenueData['totalStudents'])}'
+                                      : '₹0'),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      // Notes section
+                      if (data['Notes'] != null &&
+                          data['Notes'].toString().isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        Text(
+                          'Notes',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: ColorManager.textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.yellow.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.yellow.shade200),
+                          ),
+                          child: Text(
+                            data['Notes'],
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: ColorManager.textMedium,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Action buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close'),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _editFranchise(data);
+                    },
+                    icon: const Icon(Icons.edit),
+                    label: const Text('Edit Franchise'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ColorManager.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard(
+      String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              color: ColorManager.textMedium,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: ColorManager.textDark,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: ColorManager.textMedium,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -823,8 +1470,26 @@ class _FranchisesContentState extends State<FranchisesContent> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Franchise'),
-        content: Text(
-            'Are you sure you want to delete ${data['FranchiseName']}? This action cannot be undone.'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to delete ${data['FranchiseName']}?'),
+            const SizedBox(height: 8),
+            const Text(
+              'This will also delete:',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
+            const Text('• All commission records'),
+            const Text('• Transaction history'),
+            const Text('• Associated student records'),
+            const SizedBox(height: 8),
+            const Text(
+              'This action cannot be undone.',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -833,30 +1498,59 @@ class _FranchisesContentState extends State<FranchisesContent> {
           ElevatedButton(
             onPressed: () async {
               try {
+                String franchiseEmail = data['Email'] ?? '';
+
+                // Show loading
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Row(
+                      children: [
+                        CircularProgressIndicator(strokeWidth: 2),
+                        SizedBox(width: 16),
+                        Text('Deleting franchise and related data...'),
+                      ],
+                    ),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+
                 // Delete from Users collection
                 await _firestore
                     .collection('Users')
                     .doc('franchise')
                     .collection('accounts')
-                    .doc(data['Email'])
+                    .doc(franchiseEmail)
                     .delete();
 
-                // Delete from Franchises collection
-                await _firestore
-                    .collection('Franchises')
-                    .doc(data['Email'])
-                    .delete();
+                // Delete all franchise commissions
+                QuerySnapshot commissions = await _firestore
+                    .collection('FranchiseCommissions')
+                    .where('franchiseEmail', isEqualTo: franchiseEmail)
+                    .get();
 
-                Navigator.pop(context);
+                WriteBatch batch = _firestore.batch();
+                for (var doc in commissions.docs) {
+                  batch.delete(doc.reference);
+                }
+                await batch.commit();
+
+                // Remove from cache
+                _franchiseRevenueCache.remove(franchiseEmail);
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                      content: Text('Franchise deleted successfully')),
+                    content: Text('Franchise deleted successfully'),
+                    backgroundColor: Colors.green,
+                  ),
                 );
                 _refreshPage();
               } catch (e) {
-                Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error deleting franchise: $e')),
+                  SnackBar(
+                    content: Text('Error deleting franchise: $e'),
+                    backgroundColor: Colors.red,
+                  ),
                 );
               }
             },

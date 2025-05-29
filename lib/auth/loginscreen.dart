@@ -40,7 +40,54 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  // Helper method to get user-friendly error messages
+  String _getUserFriendlyErrorMessage(dynamic error) {
+    String errorMessage = error.toString().toLowerCase();
+
+    // Firebase Auth specific errors
+    if (errorMessage.contains('user-not-found')) {
+      return 'No account found with this email address. Please check your email or sign up.';
+    } else if (errorMessage.contains('wrong-password')) {
+      return 'Incorrect password. Please try again or reset your password.';
+    } else if (errorMessage.contains('invalid-email')) {
+      return 'Please enter a valid email address.';
+    } else if (errorMessage.contains('user-disabled')) {
+      return 'This account has been disabled. Please contact support for assistance.';
+    } else if (errorMessage.contains('too-many-requests')) {
+      return 'Too many failed attempts. Please try again later or reset your password.';
+    } else if (errorMessage.contains('network-request-failed')) {
+      return 'Network error. Please check your internet connection and try again.';
+    } else if (errorMessage.contains('invalid-credential')) {
+      return 'Invalid login credentials. Please check your email and password.';
+    } else if (errorMessage.contains('operation-not-allowed')) {
+      return 'Email/password sign-in is not enabled. Please contact support.';
+    } else if (errorMessage.contains('weak-password')) {
+      return 'Password is too weak. Please choose a stronger password.';
+    } else if (errorMessage.contains('email-already-in-use')) {
+      return 'An account with this email already exists. Please sign in instead.';
+    }
+
+    // Firestore specific errors
+    else if (errorMessage.contains('permission-denied')) {
+      return 'Access denied. Please check your account permissions.';
+    } else if (errorMessage.contains('unavailable')) {
+      return 'Service temporarily unavailable. Please try again later.';
+    } else if (errorMessage.contains('deadline-exceeded')) {
+      return 'Request timed out. Please check your internet connection and try again.';
+    }
+
+    // Generic fallback messages
+    else if (errorMessage.contains('failed') ||
+        errorMessage.contains('error')) {
+      return 'Login failed. Please check your credentials and try again.';
+    } else {
+      return 'Something went wrong. Please try again or contact support if the problem persists.';
+    }
+  }
+
   void login() {
+    if (!mounted) return;
+
     if (_formfield.currentState!.validate()) {
       setState(() {
         loading = true;
@@ -52,6 +99,8 @@ class _LoginScreenState extends State<LoginScreen> {
         password: passwordController.text.trim(),
       )
           .then((userCredential) async {
+        if (!mounted) return;
+
         // Verify user's role matches selected role
         String uid = userCredential.user!.uid;
 
@@ -64,11 +113,13 @@ class _LoginScreenState extends State<LoginScreen> {
               .doc(emailController.text.trim())
               .get();
 
+          if (!mounted) return;
+
           if (userDoc.exists) {
             setState(() {
               loading = false;
             });
-            Utils().toastMessage('Login successful');
+            Utils().toastMessage('Welcome back! Login successful.');
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
@@ -78,24 +129,27 @@ class _LoginScreenState extends State<LoginScreen> {
           } else {
             // User not found in the selected role collection
             await _auth.signOut();
+            if (!mounted) return;
             setState(() {
               loading = false;
             });
             Utils().toastMessage(
-              'User not registered as $selectedRole. Please check your credentials.',
+              'This account is not registered as a ${getRoleDisplayName().toLowerCase()}. Please select the correct role or contact support.',
             );
           }
         } catch (e) {
+          if (!mounted) return;
           setState(() {
             loading = false;
           });
-          Utils().toastMessage(e.toString());
+          Utils().toastMessage(_getUserFriendlyErrorMessage(e));
         }
       }).catchError((error) {
+        if (!mounted) return;
         setState(() {
           loading = false;
         });
-        Utils().toastMessage(error.toString());
+        Utils().toastMessage(_getUserFriendlyErrorMessage(error));
       });
     }
   }
@@ -617,13 +671,191 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // Forgot password functionality
+  void _showForgotPasswordDialog() {
+    final forgotPasswordController = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        bool isLoading = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.lock_reset,
+                    color: ColorManager.primary,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Reset Password',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: ColorManager.textDark,
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.8,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Enter your email address and we\'ll send you a link to reset your password.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: ColorManager.textMedium,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: forgotPasswordController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: 'Email Address',
+                        hintText: 'Enter your email',
+                        prefixIcon: Icon(
+                          Icons.email_outlined,
+                          color: ColorManager.primary,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: ColorManager.primary,
+                            width: 2,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isLoading
+                      ? null
+                      : () {
+                          forgotPasswordController.dispose();
+                          Navigator.of(dialogContext).pop();
+                        },
+                  style: TextButton.styleFrom(
+                    foregroundColor: ColorManager.textMedium,
+                  ),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          await _handlePasswordReset(forgotPasswordController,
+                              setDialogState, dialogContext);
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ColorManager.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                  ),
+                  child: isLoading
+                      ? SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text(
+                          'Send Reset Link',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Separate method to handle password reset logic
+  Future<void> _handlePasswordReset(TextEditingController controller,
+      StateSetter setDialogState, BuildContext dialogContext) async {
+    String email = controller.text.trim();
+
+    if (email.isEmpty) {
+      Utils().toastMessage('Please enter your email address.');
+      return;
+    }
+
+    if (!RegExp(r"^[a-zA-Z0-9.]+@[a-zA-Z0-9]+\.[a-zA-Z]+").hasMatch(email)) {
+      Utils().toastMessage('Please enter a valid email address.');
+      return;
+    }
+
+    setDialogState(() {
+      // Update loading state in dialog
+    });
+
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+
+      // Close the current dialog first
+      controller.dispose();
+      Navigator.of(dialogContext).pop();
+
+      // Wait for the dialog to close completely before showing success
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Show success message as toast instead of dialog to avoid conflicts
+      Utils().toastMessage(
+          'Password reset link sent to $email. Please check your email and spam folder.');
+    } catch (e) {
+      setDialogState(() {
+        // Reset loading state in dialog
+      });
+      Utils().toastMessage(_getUserFriendlyErrorMessage(e));
+    }
+  }
+
   Widget _buildForgotPassword() {
     return Align(
       alignment: Alignment.centerRight,
       child: TextButton(
-        onPressed: () {
-          /* Add forgot password logic */
-        },
+        onPressed: _showForgotPasswordDialog,
         style: TextButton.styleFrom(
           foregroundColor: ColorManager.textDark,
           padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 8),

@@ -10,6 +10,27 @@ class MembershipService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TransactionService _transactionService =
       TransactionService(); // Add this
+  Future<double> getMembershipFee() async {
+    try {
+      final doc =
+          await _firestore.collection('website_general').doc('dashboard').get();
+
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        final websiteContent = data['websiteContent'] as Map<String, dynamic>?;
+
+        if (websiteContent != null &&
+            websiteContent.containsKey('membershipFee')) {
+          return (websiteContent['membershipFee'] as num?)?.toDouble() ??
+              1000.0;
+        }
+      }
+      return 1000.0; // Default fallback
+    } catch (e) {
+      print('Error fetching membership fee: $e');
+      return 1000.0; // Default fallback
+    }
+  }
 
   // Get current user's membership status
   Future<Map<String, dynamic>> getMembershipStatus() async {
@@ -102,17 +123,17 @@ class MembershipService {
         throw Exception("User not logged in");
       }
 
-      // Initialize Razorpay
+      // Get dynamic membership fee
+      double membershipFee = await getMembershipFee();
+
       Razorpay razorpay = Razorpay();
       razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, onPaymentSuccess);
       razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, onPaymentError);
       razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, onExternalWallet);
 
-      // Set up payment options
       var options = {
-        'key':
-            'rzp_test_OIvgwDrw6v8gWS', // Replace with your actual Razorpay key
-        'amount': 100000, // Amount in paise (₹1000)
+        'key': 'rzp_test_OIvgwDrw6v8gWS',
+        'amount': (membershipFee * 100).toInt(), // Convert to paise
         'name': 'LuYip Education',
         'description': 'Yearly Membership',
         'prefill': {'email': currentUser.email ?? ''},
@@ -121,7 +142,6 @@ class MembershipService {
         },
       };
 
-      // Open Razorpay payment window
       razorpay.open(options);
       return true;
     } catch (e) {
@@ -134,10 +154,11 @@ class MembershipService {
   // This method is kept for backward compatibility but delegates to the TransactionService
   Future<bool> activateMembership(String transactionId) async {
     try {
-      // Delegate to the new TransactionService
+      double membershipFee = await getMembershipFee();
+
       return await _transactionService.activateMembership(
         transactionId: transactionId,
-        amount: 1000.0, // Annual membership fee (₹1000)
+        amount: membershipFee, // Use dynamic fee
         currency: 'INR',
       );
     } catch (e) {

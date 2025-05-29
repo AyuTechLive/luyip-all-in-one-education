@@ -34,6 +34,8 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
   final phoneController = TextEditingController();
   bool _isPasswordVisible = false;
   File? _profileImage;
+  String? franchiseEmail;
+  String? franchisePassword;
 
   late Razorpay _razorpay;
 
@@ -43,7 +45,7 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
   final TransactionService _transactionService = TransactionService();
 
   // Payment configuration
-  final double membershipFee = 1000.0;
+  double membershipFee = 1000.0;
   double franchiseCommissionPercentage = 20.0;
 
   // Temporary storage for student data during payment
@@ -54,6 +56,41 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
     super.initState();
     _initializeRazorpay();
     _fetchFranchiseCommission();
+    _initializeFranchiseData();
+    _loadMembershipFee();
+  }
+
+  Future<void> _loadMembershipFee() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('website_general')
+          .doc('dashboard')
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        final websiteContent = data['websiteContent'] as Map<String, dynamic>?;
+
+        if (websiteContent != null &&
+            websiteContent.containsKey('membershipFee')) {
+          setState(() {
+            membershipFee =
+                (websiteContent['membershipFee'] as num?)?.toDouble() ?? 1000.0;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading membership fee: $e');
+      // Keep default value
+    }
+  }
+
+  void _initializeFranchiseData() {
+    User? currentUser = _auth.currentUser;
+    if (currentUser != null && currentUser.email != null) {
+      franchiseEmail = currentUser.email!;
+      print('Franchise email stored globally: $franchiseEmail');
+    }
   }
 
   void _initializeRazorpay() {
@@ -92,7 +129,6 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
         Map<String, dynamic> franchiseData =
             franchiseDoc.data() as Map<String, dynamic>;
 
-        // Get commission percentage from Firestore
         double commissionFromFirestore =
             (franchiseData['CommissionPercent'] as num?)?.toDouble() ?? 20.0;
 
@@ -107,13 +143,14 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
       }
     } catch (e) {
       print('Error fetching franchise commission: $e');
-      // Keep the default value if there's an error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Note: Using default commission rate. Error: $e'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Note: Using default commission rate. Error: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     }
   }
 
@@ -125,117 +162,6 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
       setState(() {
         _profileImage = File(pickedFile.path);
       });
-    }
-  }
-
-  Future<void> _updateFranchiseRevenue(
-      String transactionId, double commissionAmount) async {
-    try {
-      User? currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        print('No current user found');
-        return;
-      }
-
-      print('Updating franchise revenue for: ${currentUser.email}');
-      print('Commission amount: ₹$commissionAmount');
-
-      // Get current franchise data
-      DocumentReference franchiseRef = _firestore
-          .collection('Users')
-          .doc('franchise')
-          .collection('accounts')
-          .doc(currentUser.email);
-
-      // Use a transaction to ensure data consistency
-      await _firestore.runTransaction((transaction) async {
-        DocumentSnapshot franchiseDoc = await transaction.get(franchiseRef);
-
-        Map<String, dynamic> franchiseData = {};
-        if (franchiseDoc.exists) {
-          franchiseData = franchiseDoc.data() as Map<String, dynamic>;
-        }
-
-        // Get current revenue data or initialize with defaults
-        Map<String, dynamic> revenueData =
-            franchiseData['revenue'] as Map<String, dynamic>? ??
-                {
-                  'totalRevenue': 0.0,
-                  'totalStudentsAdded': 0,
-                  'recentTransactions': [],
-                  'monthlyRevenue': {},
-                  'currency': 'INR',
-                };
-
-        // Calculate new totals
-        double currentTotalRevenue =
-            (revenueData['totalRevenue'] as num?)?.toDouble() ?? 0.0;
-        int currentTotalStudents =
-            (revenueData['totalStudentsAdded'] as int?) ?? 0;
-        List<dynamic> currentTransactions =
-            List.from(revenueData['recentTransactions'] as List? ?? []);
-        Map<String, dynamic> monthlyRevenue = Map<String, dynamic>.from(
-            revenueData['monthlyRevenue'] as Map<String, dynamic>? ?? {});
-
-        // Update totals
-        double newTotalRevenue = currentTotalRevenue + commissionAmount;
-        int newTotalStudents = currentTotalStudents + 1;
-
-        // Add new transaction to recent transactions (keep last 10)
-        Map<String, dynamic> newTransaction = {
-          'transactionId': transactionId,
-          'amount': commissionAmount,
-          'type': 'membership_commission',
-          'studentEmail': pendingStudentData!['email'],
-          'studentName': pendingStudentData!['name'],
-          'date': FieldValue.serverTimestamp(),
-          'franchise': widget.franchiseName,
-        };
-
-        currentTransactions.insert(0, newTransaction);
-        if (currentTransactions.length > 10) {
-          currentTransactions = currentTransactions.sublist(0, 10);
-        }
-
-        // Get current month/year for monthly tracking
-        DateTime now = DateTime.now();
-        String monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-
-        double currentMonthRevenue =
-            (monthlyRevenue[monthKey] as num?)?.toDouble() ?? 0.0;
-        monthlyRevenue[monthKey] = currentMonthRevenue + commissionAmount;
-
-        // Create updated revenue data
-        Map<String, dynamic> updatedRevenueData = {
-          'totalRevenue': newTotalRevenue,
-          'totalStudentsAdded': newTotalStudents,
-          'recentTransactions': currentTransactions,
-          'monthlyRevenue': monthlyRevenue,
-          'lastUpdated': FieldValue.serverTimestamp(),
-          'currency': 'INR',
-          'averageCommissionPerStudent':
-              newTotalStudents > 0 ? newTotalRevenue / newTotalStudents : 0.0,
-        };
-
-        // Update franchise document with new revenue data
-        Map<String, dynamic> updateData =
-            Map<String, dynamic>.from(franchiseData);
-        updateData['revenue'] = updatedRevenueData;
-
-        transaction.set(franchiseRef, updateData, SetOptions(merge: true));
-
-        print(
-            'Revenue updated successfully: Total: ₹$newTotalRevenue, Students: $newTotalStudents');
-      });
-    } catch (e) {
-      print('Error updating franchise revenue: $e');
-      // Show error to user but don't break the flow
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Note: Revenue tracking may not be updated. Error: $e'),
-          backgroundColor: Colors.orange,
-        ),
-      );
     }
   }
 
@@ -257,7 +183,6 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
       isProcessingPayment = true;
     });
 
-    // Store student data temporarily
     pendingStudentData = {
       'email': emailController.text.trim(),
       'password': passwordController.text.trim(),
@@ -270,8 +195,8 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
       double netAmount = _calculateNetAmount();
 
       var options = {
-        'key': 'rzp_test_OIvgwDrw6v8gWS', // Replace with your actual key
-        'amount': (netAmount * 100).toInt(), // Amount in paise
+        'key': 'rzp_test_OIvgwDrw6v8gWS',
+        'amount': (netAmount * 100).toInt(),
         'name': 'LuYip Education',
         'description': 'Student Membership - ${nameController.text.trim()}',
         'prefill': {
@@ -291,12 +216,14 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
         isProcessingPayment = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error initiating payment: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error initiating payment: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -307,7 +234,6 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
         isProcessingPayment = false;
       });
 
-      // Generate consistent transaction ID format
       String transactionId =
           'TXN_FRANCHISE_${DateTime.now().millisecondsSinceEpoch}';
 
@@ -317,12 +243,14 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
         loading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error creating student: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error creating student: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -331,12 +259,15 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
       isProcessingPayment = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Payment failed: ${response.message ?? 'Unknown error'}'),
-        backgroundColor: Colors.red,
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text('Payment failed: ${response.message ?? 'Unknown error'}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
@@ -344,12 +275,14 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
       isProcessingPayment = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('External wallet: ${response.walletName}'),
-        backgroundColor: Colors.blue,
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('External wallet: ${response.walletName}'),
+          backgroundColor: Colors.blue,
+        ),
+      );
+    }
   }
 
   Future<String?> _uploadProfileImage(String userId) async {
@@ -374,13 +307,11 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
     }
 
     try {
-      // Store current franchise user
       User? franchiseUser = _auth.currentUser;
       if (franchiseUser == null) {
         throw Exception('Franchise user not logged in');
       }
 
-      // Create Firebase user for student (this will temporarily sign in as student)
       UserCredential userCredential =
           await _auth.createUserWithEmailAndPassword(
         email: pendingStudentData!['email'],
@@ -388,23 +319,18 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
       );
 
       String userId = userCredential.user!.uid;
-
-      // Sign out the student immediately
       await _auth.signOut();
 
-      // Sign back in as the franchise user
       await _auth.signInWithEmailAndPassword(
         email: franchiseUser.email!,
         password: await _promptForFranchisePassword(),
       );
 
-      // Upload profile image if exists (now as franchise user again)
       String? profilePicURL;
       if (pendingStudentData!['profileImage'] != null) {
         profilePicURL = await _uploadProfileImage(userId);
       }
 
-      // Create membership details
       DateTime startDate = DateTime.now();
       DateTime expiryDate = startDate.add(const Duration(days: 365));
       String membershipId =
@@ -412,7 +338,6 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
       String formattedDate =
           '${startDate.day}-${startDate.month}-${startDate.year}';
 
-      // Create student document
       Map<String, dynamic> userData = {
         'Email': pendingStudentData!['email'],
         'UID': userId,
@@ -430,15 +355,13 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
           'startDate': startDate,
           'expiryDate': expiryDate,
           'membershipId': membershipId,
-          'transactionId': transactionId, // Use consistent transaction ID
-          'razorpayPaymentId':
-              razorpayPaymentId, // Store Razorpay payment ID separately
+          'transactionId': transactionId,
+          'razorpayPaymentId': razorpayPaymentId,
           'addedByFranchise': true,
           'franchiseName': widget.franchiseName,
         },
       };
 
-      // Save to Firestore
       await _firestore
           .collection('Users')
           .doc('student')
@@ -446,7 +369,6 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
           .doc(pendingStudentData!['email'])
           .set(userData);
 
-      // Record membership transaction with consistent transaction ID
       await _transactionService.recordMembershipTransaction(
         transactionId: transactionId,
         amount: _calculateNetAmount(),
@@ -458,8 +380,8 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
         franchiseCommission: _getCommissionAmount(),
       );
 
-      // Record franchise commission with consistent transaction ID
       await _transactionService.recordFranchiseCommission(
+        franchiseEmail: franchiseEmail!,
         transactionId: transactionId,
         franchiseName: widget.franchiseName,
         commissionAmount: _getCommissionAmount(),
@@ -469,10 +391,6 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
         type: 'membership',
       );
 
-      // Update franchise revenue data with consistent transaction ID
-      await _updateFranchiseRevenue(transactionId, _getCommissionAmount());
-
-      // Clear pending data
       pendingStudentData = null;
 
       setState(() {
@@ -481,37 +399,48 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
 
       Utils().toastMessage('Student added successfully with membership!');
 
-      // Show detailed success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('✅ Student Account Created'),
-              const Text('✅ Membership Activated'),
-              const Text('✅ Commission Recorded'),
-              Text(
-                  '💰 Commission Earned: ₹${_getCommissionAmount().toStringAsFixed(0)}'),
-              Text('🔗 Transaction ID: $transactionId'),
-            ],
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('✅ Student Account Created'),
+                const Text('✅ Membership Activated'),
+                const Text('✅ Commission Recorded'),
+                Text(
+                    '💰 Commission Earned: ₹${_getCommissionAmount().toStringAsFixed(0)}'),
+                Text('🔗 Transaction ID: $transactionId'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
           ),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 4),
-        ),
-      );
+        );
 
-      widget.onStudentAdded();
-      Navigator.pop(context);
+        widget.onStudentAdded();
+        Navigator.pop(context);
+      }
     } catch (e) {
       setState(() {
         loading = false;
       });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error creating student: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+
       throw e;
     }
   }
 
-  // Method to prompt franchise user for password (for re-authentication)
   Future<String> _promptForFranchisePassword() async {
     String? password;
     await showDialog(
@@ -554,248 +483,414 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text('Add New Student'),
+        title: const Text(
+          'Add New Student',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         backgroundColor: const Color(0xFF2E7D32),
         foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 20),
-
-            // Franchise info header
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2E7D32).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border:
-                    Border.all(color: const Color(0xFF2E7D32).withOpacity(0.3)),
-              ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Form(
+              key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.business, color: const Color(0xFF2E7D32)),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Franchise: ${widget.franchiseName}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Membership Fee:'),
-                            Text('₹${membershipFee.toStringAsFixed(0)}'),
-                          ],
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                                'Commission (${franchiseCommissionPercentage.toStringAsFixed(1)}%):'), // Now shows dynamic percentage
-                            Text(
-                                '₹${_getCommissionAmount().toStringAsFixed(0)}'),
-                          ],
-                        ),
-                        const Divider(),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Amount to Pay:',
-                                style: TextStyle(fontWeight: FontWeight.bold)),
-                            Text(
-                              '₹${_calculateNetAmount().toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF2E7D32),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+                  // Franchise Info Card
+                  _buildFranchiseInfoCard(),
+
+                  const SizedBox(height: 32),
+
+                  // Profile Section
+                  _buildProfileSection(),
+
+                  const SizedBox(height: 32),
+
+                  // Form Fields
+                  _buildFormFields(),
+
+                  const SizedBox(height: 40),
+
+                  // Submit Button
+                  _buildSubmitButton(),
+
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
-
-            const SizedBox(height: 20),
-
-            // Profile Image
-            Center(
-              child: Stack(
-                children: [
-                  Container(
-                    height: 120,
-                    width: 120,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      shape: BoxShape.circle,
-                    ),
-                    child: _profileImage != null
-                        ? ClipOval(
-                            child: Image.file(
-                              _profileImage!,
-                              fit: BoxFit.cover,
-                              height: 120,
-                              width: 120,
-                            ),
-                          )
-                        : const Icon(Icons.person,
-                            size: 60, color: Colors.grey),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: _pickImage,
-                      child: Container(
-                        height: 35,
-                        width: 35,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF2E7D32),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.camera_alt,
-                            color: Colors.white, size: 18),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Form
-            Expanded(
-              child: Form(
-                key: _formKey,
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildTextField('Full Name', 'Enter student name',
-                          nameController, Icons.person),
-                      const SizedBox(height: 15),
-                      _buildTextField('Email', 'Enter student email',
-                          emailController, Icons.email),
-                      const SizedBox(height: 15),
-                      _buildTextField('Phone', 'Enter phone number',
-                          phoneController, Icons.phone),
-                      const SizedBox(height: 15),
-                      _buildPasswordField(),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Submit Button
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2E7D32),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed:
-                    (loading || isProcessingPayment) ? null : _initiatePayment,
-                child: (loading || isProcessingPayment)
-                    ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            isProcessingPayment
-                                ? 'Processing Payment...'
-                                : 'Creating Account...',
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ],
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.payment, color: Colors.white),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Pay ₹${_calculateNetAmount().toStringAsFixed(0)} & Add Student',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildTextField(String label, String hint,
-      TextEditingController controller, IconData icon) {
+  Widget _buildFranchiseInfoCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF2E7D32),
+            const Color(0xFF388E3C),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2E7D32).withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.business,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  widget.franchiseName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+              ),
+            ),
+            child: Column(
+              children: [
+                _buildPriceRow(
+                  'Membership Fee',
+                  '₹${membershipFee.toStringAsFixed(0)}',
+                  isSubtle: true,
+                ),
+                const SizedBox(height: 8),
+                _buildPriceRow(
+                  'Your Commission (${franchiseCommissionPercentage.toStringAsFixed(1)}%)',
+                  '₹${_getCommissionAmount().toStringAsFixed(0)}',
+                  isHighlighted: true,
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  height: 1,
+                  color: Colors.white.withOpacity(0.3),
+                ),
+                const SizedBox(height: 12),
+                _buildPriceRow(
+                  'Amount to Pay',
+                  '₹${_calculateNetAmount().toStringAsFixed(0)}',
+                  isFinal: true,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceRow(
+    String label,
+    String amount, {
+    bool isSubtle = false,
+    bool isHighlighted = false,
+    bool isFinal = false,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: isSubtle ? 14 : (isFinal ? 16 : 15),
+            fontWeight: isFinal ? FontWeight.bold : FontWeight.normal,
+            // opacity: isSubtle ? 0.8 : 1.0,
+          ),
+        ),
+        Container(
+          padding: isHighlighted
+              ? const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                )
+              : EdgeInsets.zero,
+          decoration: isHighlighted
+              ? BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(6),
+                )
+              : null,
+          child: Text(
+            amount,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: isSubtle ? 14 : (isFinal ? 18 : 15),
+              fontWeight: isFinal
+                  ? FontWeight.bold
+                  : (isHighlighted ? FontWeight.w600 : FontWeight.normal),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProfileSection() {
+    return Center(
+      child: Column(
+        children: [
+          const Text(
+            'Student Profile Picture',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF2E7D32),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Stack(
+            children: [
+              Container(
+                height: 120,
+                width: 120,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFF2E7D32).withOpacity(0.2),
+                    width: 3,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: _profileImage != null
+                    ? ClipOval(
+                        child: Image.file(
+                          _profileImage!,
+                          fit: BoxFit.cover,
+                          height: 120,
+                          width: 120,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.person,
+                        size: 50,
+                        color: Color(0xFF2E7D32),
+                      ),
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: GestureDetector(
+                  onTap: _pickImage,
+                  child: Container(
+                    height: 40,
+                    width: 40,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF2E7D32),
+                          const Color(0xFF388E3C),
+                        ],
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF2E7D32).withOpacity(0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormFields() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: hint,
-            filled: true,
-            fillColor: const Color(0xFF2E7D32).withOpacity(0.1),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide.none,
-            ),
-            prefixIcon: Icon(icon, color: const Color(0xFF2E7D32)),
+        const Text(
+          'Student Information',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF2E7D32),
           ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter $label';
-            }
-            if (label == 'Email' &&
-                !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-              return 'Enter a valid email';
-            }
-            if (label == 'Phone' && value.length < 10) {
-              return 'Enter a valid phone number';
-            }
-            return null;
-          },
+        ),
+        const SizedBox(height: 20),
+        _buildTextField(
+          'Full Name',
+          'Enter student\'s full name',
+          nameController,
+          Icons.person_outline,
+        ),
+        const SizedBox(height: 20),
+        _buildTextField(
+          'Email Address',
+          'Enter student\'s email',
+          emailController,
+          Icons.email_outlined,
+        ),
+        const SizedBox(height: 20),
+        _buildTextField(
+          'Phone Number',
+          'Enter phone number',
+          phoneController,
+          Icons.phone_outlined,
+        ),
+        const SizedBox(height: 20),
+        _buildPasswordField(),
+      ],
+    );
+  }
+
+  Widget _buildTextField(
+    String label,
+    String hint,
+    TextEditingController controller,
+    IconData icon,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF424242),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: TextFormField(
+            controller: controller,
+            style: const TextStyle(fontSize: 16),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 15,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: Colors.grey.shade300,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: Colors.grey.shade300,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: Color(0xFF2E7D32),
+                  width: 2,
+                ),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: Colors.red,
+                ),
+              ),
+              prefixIcon: Icon(
+                icon,
+                color: const Color(0xFF2E7D32),
+                size: 22,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter $label';
+              }
+              if (label == 'Email Address' &&
+                  !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                      .hasMatch(value)) {
+                return 'Enter a valid email address';
+              }
+              if (label == 'Phone Number' && value.length < 10) {
+                return 'Enter a valid phone number';
+              }
+              return null;
+            },
+          ),
         ),
       ],
     );
@@ -805,40 +900,169 @@ class _FranchiseAddStudentPageState extends State<FranchiseAddStudentPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Password', style: TextStyle(fontWeight: FontWeight.bold)),
+        const Text(
+          'Password',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF424242),
+          ),
+        ),
         const SizedBox(height: 8),
-        TextFormField(
-          controller: passwordController,
-          obscureText: !_isPasswordVisible,
-          decoration: InputDecoration(
-            hintText: 'Create password',
-            filled: true,
-            fillColor: const Color(0xFF2E7D32).withOpacity(0.1),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide.none,
-            ),
-            prefixIcon: const Icon(Icons.lock, color: Color(0xFF2E7D32)),
-            suffixIcon: IconButton(
-              onPressed: () =>
-                  setState(() => _isPasswordVisible = !_isPasswordVisible),
-              icon: Icon(
-                _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                color: const Color(0xFF2E7D32),
+        Container(
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: TextFormField(
+            controller: passwordController,
+            obscureText: !_isPasswordVisible,
+            style: const TextStyle(fontSize: 16),
+            decoration: InputDecoration(
+              hintText: 'Create a secure password',
+              hintStyle: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 15,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: Colors.grey.shade300,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: Colors.grey.shade300,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: Color(0xFF2E7D32),
+                  width: 2,
+                ),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: Colors.red,
+                ),
+              ),
+              prefixIcon: const Icon(
+                Icons.lock_outline,
+                color: Color(0xFF2E7D32),
+                size: 22,
+              ),
+              suffixIcon: IconButton(
+                onPressed: () =>
+                    setState(() => _isPasswordVisible = !_isPasswordVisible),
+                icon: Icon(
+                  _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                  color: const Color(0xFF2E7D32),
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
               ),
             ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter a password';
+              }
+              if (value.length < 6) {
+                return 'Password must be at least 6 characters';
+              }
+              return null;
+            },
           ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter password';
-            }
-            if (value.length < 6) {
-              return 'Password must be at least 6 characters';
-            }
-            return null;
-          },
         ),
       ],
+    );
+  }
+
+  Widget _buildSubmitButton() {
+    return Container(
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF2E7D32),
+            const Color(0xFF388E3C),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2E7D32).withOpacity(0.4),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        onPressed: (loading || isProcessingPayment) ? null : _initiatePayment,
+        child: (loading || isProcessingPayment)
+            ? Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2.5,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(
+                    isProcessingPayment
+                        ? 'Processing Payment...'
+                        : 'Creating Account...',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.payment,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Pay ₹${_calculateNetAmount().toStringAsFixed(0)} & Add Student',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+      ),
     );
   }
 }

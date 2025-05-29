@@ -768,6 +768,20 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
     String? userEmailsDocumentId = checkUserAuthenticationType();
     String courseFieldKey = coursename;
 
+    // For franchise users, directly navigate to course details without checking enrollment
+    if (widget.userType == 'franchise') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CourseDetails(
+            userRole: widget.userType,
+            coursename: coursename,
+          ),
+        ),
+      );
+      return;
+    }
+
     DocumentReference emailsDocumentRef = firestore
         .collection(usersCollectionPath)
         .doc(widget.userType)
@@ -789,9 +803,6 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
             builder: (context) => CourseDetails(
               userRole: widget.userType,
               coursename: coursename,
-              // courseprice: courseprice,
-              // courseImage: courseimg,
-              // coursediscription: coursediscription,
             ),
           ),
         );
@@ -809,9 +820,6 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
           builder: (context) => CourseDetails(
             userRole: widget.userType,
             coursename: coursename,
-            // courseprice: courseprice,
-            // courseImage: courseimg,
-            // coursediscription: coursediscription,
           ),
         ),
       );

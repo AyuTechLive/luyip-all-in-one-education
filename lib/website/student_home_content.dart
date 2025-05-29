@@ -89,7 +89,8 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
       TextEditingController();
   final TextEditingController _announcementContentController =
       TextEditingController();
-
+  final TextEditingController _membershipFeeController =
+      TextEditingController();
   // Events
   final TextEditingController _eventTitleController = TextEditingController();
   final TextEditingController _eventCategoryController =
@@ -129,6 +130,7 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
   @override
   void dispose() {
     _tabController.dispose();
+    _membershipFeeController.dispose();
     // Website content controllers
     _facebookController.dispose();
     _youtubeController.dispose();
@@ -225,6 +227,8 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
   }
 
   void _populateFormControllers(Map<String, dynamic> websiteContent) {
+    _membershipFeeController.text =
+        websiteContent['membershipFee']?.toString() ?? '1000';
     // Existing form population...
     _logoUrlController.text = websiteContent['logoUrl']?.toString() ?? '';
     _companyNameController.text =
@@ -812,6 +816,26 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
           ),
 
           const SizedBox(height: 20),
+          _buildSectionCard(
+            'Membership Settings',
+            [
+              TextField(
+                controller: _membershipFeeController,
+                decoration: _inputDecoration('Annual Membership Fee (₹)'),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'This fee will be used across all membership-related transactions',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: ColorManager.textMedium,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+            isSmallScreen,
+          ),
 
           // Other Settings
           _buildSectionCard(
@@ -992,6 +1016,8 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
 
       // Build website content map
       final websiteContent = {
+        'membershipFee':
+            double.tryParse(_membershipFeeController.text) ?? 1000.0,
         'logoUrl': logoUrl ?? '',
         'companyName': _companyNameController.text,
         'companyShortName': _companyShortNameController.text,
