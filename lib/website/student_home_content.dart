@@ -58,6 +58,11 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
   final TextEditingController _loadingTextController = TextEditingController();
   final TextEditingController _contactNumberController =
       TextEditingController();
+  final TextEditingController _facebookController = TextEditingController();
+  final TextEditingController _youtubeController = TextEditingController();
+  final TextEditingController _telegramController = TextEditingController();
+  final TextEditingController _instagramController = TextEditingController();
+  final TextEditingController _linkedinController = TextEditingController();
 
   // Logo image handling
   XFile? _pickedLogoImage;
@@ -125,6 +130,11 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
   void dispose() {
     _tabController.dispose();
     // Website content controllers
+    _facebookController.dispose();
+    _youtubeController.dispose();
+    _telegramController.dispose();
+    _instagramController.dispose();
+    _linkedinController.dispose();
     _logoUrlController.dispose();
     _companyNameController.dispose();
     _companyShortNameController.dispose();
@@ -215,6 +225,7 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
   }
 
   void _populateFormControllers(Map<String, dynamic> websiteContent) {
+    // Existing form population...
     _logoUrlController.text = websiteContent['logoUrl']?.toString() ?? '';
     _companyNameController.text =
         websiteContent['companyName']?.toString() ?? 'Luiyp Education';
@@ -264,6 +275,17 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
         'Loading your educational journey...';
     _contactNumberController.text =
         websiteContent['contactNumber']?.toString() ?? '+911234567890';
+
+    // Social Media Links population
+    final socialMediaLinks = websiteContent['socialMediaLinks'];
+    if (socialMediaLinks is Map) {
+      final socialLinks = Map<String, String>.from(socialMediaLinks);
+      _facebookController.text = socialLinks['facebook'] ?? '';
+      _youtubeController.text = socialLinks['youtube'] ?? '';
+      _telegramController.text = socialLinks['telegram'] ?? '';
+      _instagramController.text = socialLinks['instagram'] ?? '';
+      _linkedinController.text = socialLinks['linkedin'] ?? '';
+    }
   }
 
   Future<void> _saveWebsiteData(Map<String, dynamic> websiteData) async {
@@ -743,6 +765,54 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
 
           const SizedBox(height: 20),
 
+          // Social Media Section
+          _buildSectionCard(
+            'Social Media Links',
+            [
+              Text(
+                'Configure social media links for the footer',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: ColorManager.textMedium,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _facebookController,
+                decoration: _inputDecoration('Facebook URL'),
+                keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _youtubeController,
+                decoration: _inputDecoration('YouTube URL'),
+                keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _telegramController,
+                decoration: _inputDecoration('Telegram URL'),
+                keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _instagramController,
+                decoration: _inputDecoration('Instagram URL'),
+                keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _linkedinController,
+                decoration: _inputDecoration('LinkedIn URL'),
+                keyboardType: TextInputType.url,
+              ),
+            ],
+            isSmallScreen,
+          ),
+
+          const SizedBox(height: 20),
+
           // Other Settings
           _buildSectionCard(
             'Other Settings',
@@ -911,6 +981,15 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
         logoUrl = _logoUrlController.text;
       }
 
+      // Build social media links map
+      final socialMediaLinks = {
+        'facebook': _facebookController.text.trim(),
+        'youtube': _youtubeController.text.trim(),
+        'telegram': _telegramController.text.trim(),
+        'instagram': _instagramController.text.trim(),
+        'linkedin': _linkedinController.text.trim(),
+      };
+
       // Build website content map
       final websiteContent = {
         'logoUrl': logoUrl ?? '',
@@ -935,6 +1014,7 @@ class _WebsiteGeneralAdminPageState extends State<WebsiteGeneralAdminPage>
         'copyrightText': _copyrightTextController.text,
         'loadingText': _loadingTextController.text,
         'contactNumber': _contactNumberController.text,
+        'socialMediaLinks': socialMediaLinks, // Add social media links
       };
 
       // Update the website data

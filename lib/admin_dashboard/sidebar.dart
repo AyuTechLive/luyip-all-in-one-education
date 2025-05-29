@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:luyip_website_edu/Courses/addvideo.dart';
 import 'package:luyip_website_edu/Courses/allcourses.dart';
 import 'package:luyip_website_edu/admin_dashboard/admin_pages.dart/add_internship.dart';
@@ -78,10 +79,12 @@ class _AdminDashboardContainerState extends State<AdminDashboardContainer> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         elevation: 0,
         title: Text(
           'Luyip Admin Dashboard - $_currentPage',
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style:
+              const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
         ),
         backgroundColor: ColorManager.primary,
         actions: [
@@ -145,7 +148,7 @@ class DashboardSidebar extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 20),
-            // Logo area with gradient background
+            // Logo area with dynamic logo from Firebase
             Container(
               padding: const EdgeInsets.symmetric(vertical: 24),
               margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -157,16 +160,84 @@ class DashboardSidebar extends StatelessWidget {
                 ),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Center(
-                child: Text(
-                  "LUYIP",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 22,
-                    letterSpacing: 1.5,
-                  ),
-                ),
+              child: FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance
+                    .collection('website_general')
+                    .doc('dashboard')
+                    .get(),
+                builder: (context, snapshot) {
+                  String logoUrl = '';
+                  String companyName = 'LUYIP';
+
+                  if (snapshot.hasData && snapshot.data!.exists) {
+                    final data = snapshot.data!.data() as Map<String, dynamic>?;
+                    final websiteContent =
+                        data?['websiteContent'] as Map<String, dynamic>? ?? {};
+                    logoUrl = websiteContent['logoUrl']?.toString() ?? '';
+                    companyName = websiteContent['companyName']?.toString() ??
+                        websiteContent['companyShortName']?.toString() ??
+                        'LUYIP';
+                  }
+
+                  return Center(
+                    child: logoUrl.isNotEmpty
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Image.network(
+                                logoUrl,
+                                width: 40,
+                                height: 40,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Text(
+                                    companyName,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 22,
+                                      letterSpacing: 1.5,
+                                    ),
+                                  );
+                                },
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return const SizedBox(
+                                    width: 40,
+                                    height: 40,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(width: 12),
+                              Flexible(
+                                child: Text(
+                                  companyName,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                    letterSpacing: 1.2,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Text(
+                            companyName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 22,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                  );
+                },
               ),
             ),
             const SizedBox(height: 30),
@@ -315,19 +386,6 @@ class DashboardSidebar extends StatelessWidget {
                       'Internship',
                       isActive: selectedPage == 'Internship',
                     ),
-                    // _buildSidebarItem(
-                    //   context,
-                    //   Icons.assessment_outlined,
-                    //   'Assessments',
-                    //   isActive: selectedPage == 'Assessments',
-                    //   badge: '3',
-                    // ),
-                    // _buildSidebarItem(
-                    //   context,
-                    //   Icons.event_outlined,
-                    //   'Schedule',
-                    //   isActive: selectedPage == 'Schedule',
-                    // ),
                     _buildSidebarItem(
                       context,
                       Icons.payment_outlined,

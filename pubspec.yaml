@@ -58,6 +58,7 @@ dependencies:
   chewie: ^1.11.3
   ivlivs_pdf_viewer: ^0.1.0
   youtube_player_flutter: ^9.1.1
+  qr_code_scanner: ^1.0.1
  
   
 

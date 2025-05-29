@@ -404,186 +404,6 @@ class CertificateGenerator {
   }
 
   // Build credentials section - Optimized layout
-  static pw.Widget _buildCredentialsSection(
-    DateTime issueDate,
-    String certificateNumber,
-    String issuerName,
-    pw.ImageProvider signatureImage,
-    pw.ImageProvider sealImage,
-    pw.ImageProvider qrCodeImage,
-    pw.Font bodyFont,
-    pw.Font semiBoldFont,
-    pw.Font lightFont,
-  ) {
-    return pw.Container(
-      height: 100, // Fixed height for bottom section
-      child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: pw.CrossAxisAlignment.end,
-        children: [
-          // Date and certificate info
-          pw.Expanded(
-            flex: 3,
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(6),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(
-                      color: PdfColor.fromHex('#e0e0e0'),
-                      width: 1,
-                    ),
-                    borderRadius: pw.BorderRadius.circular(4),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'Issue Date:',
-                        style: pw.TextStyle(
-                          font: lightFont,
-                          fontSize: 7,
-                          color: PdfColor.fromHex('#666666'),
-                        ),
-                      ),
-                      pw.SizedBox(height: 1),
-                      pw.Text(
-                        DateFormat('MMMM dd, yyyy').format(issueDate),
-                        style: pw.TextStyle(
-                          font: semiBoldFont,
-                          fontSize: 9,
-                          color: PdfColor.fromHex('#333333'),
-                        ),
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text(
-                        'Certificate ID:',
-                        style: pw.TextStyle(
-                          font: lightFont,
-                          fontSize: 7,
-                          color: PdfColor.fromHex('#666666'),
-                        ),
-                      ),
-                      pw.SizedBox(height: 1),
-                      pw.Text(
-                        certificateNumber.isNotEmpty
-                            ? certificateNumber
-                            : 'CERT-ID-NOT-SET',
-                        style: pw.TextStyle(
-                          font: bodyFont,
-                          fontSize: 7,
-                          color: PdfColor.fromHex('#1565c0'),
-                        ),
-                        maxLines: 2,
-                        overflow: pw.TextOverflow.clip,
-                      ),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 4),
-                pw.Text(
-                  'Verify at: luyip.edu/verify',
-                  style: pw.TextStyle(
-                    font: bodyFont,
-                    fontSize: 7,
-                    color: PdfColor.fromHex('#1565c0'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          pw.SizedBox(width: 10),
-
-          // Signature section
-          pw.Expanded(
-            flex: 3,
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: [
-                pw.Container(
-                  height: 35,
-                  width: 100,
-                  child: pw.Image(signatureImage, fit: pw.BoxFit.contain),
-                ),
-                pw.SizedBox(height: 2),
-                pw.Container(
-                  width: 100,
-                  height: 1,
-                  color: PdfColor.fromHex('#cccccc'),
-                ),
-                pw.SizedBox(height: 3),
-                pw.Text(
-                  issuerName.isNotEmpty ? issuerName : 'Authorized Signatory',
-                  style: pw.TextStyle(
-                    font: semiBoldFont,
-                    fontSize: 8,
-                    color: PdfColor.fromHex('#333333'),
-                  ),
-                  textAlign: pw.TextAlign.center,
-                ),
-                pw.Text(
-                  'Authorized Signatory',
-                  style: pw.TextStyle(
-                    font: lightFont,
-                    fontSize: 7,
-                    color: PdfColor.fromHex('#666666'),
-                  ),
-                ),
-                pw.Text(
-                  'LUYIP Educational Institute',
-                  style: pw.TextStyle(
-                    font: bodyFont,
-                    fontSize: 6,
-                    color: PdfColor.fromHex('#666666'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          pw.SizedBox(width: 10),
-
-          // Seal and QR code
-          pw.Expanded(
-            flex: 2,
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: [
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.center,
-                  children: [
-                    pw.Container(
-                      height: 45,
-                      width: 45,
-                      child: pw.Image(sealImage, fit: pw.BoxFit.contain),
-                    ),
-                    pw.SizedBox(width: 8),
-                    pw.Container(
-                      height: 40,
-                      width: 40,
-                      child: pw.Image(qrCodeImage, fit: pw.BoxFit.contain),
-                    ),
-                  ],
-                ),
-                pw.SizedBox(height: 4),
-                pw.Text(
-                  'Scan to Verify Certificate',
-                  style: pw.TextStyle(
-                    font: lightFont,
-                    fontSize: 6,
-                    color: PdfColor.fromHex('#666666'),
-                  ),
-                  textAlign: pw.TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   // Build decorative borders
   static pw.Widget _buildDecorativeBorders() {
@@ -761,9 +581,11 @@ class CertificateGenerator {
   static Future<pw.ImageProvider> _generateQRCodeWithCertificateId(
       String certificateNumber) async {
     try {
-      // Create verification URL with certificate number
+      // Create verification URL with certificate number pointing to your actual website
       final verificationUrl =
-          'https://luyip.edu/verify?cert=$certificateNumber';
+          'https://education-all-in-one.web.app/#/verify?cert=$certificateNumber';
+
+      print('Generating QR code for URL: $verificationUrl'); // Debug log
 
       // Create QR code widget with verification URL
       final qrValidationResult = QrValidator.validate(
@@ -806,7 +628,7 @@ class CertificateGenerator {
     return _generateFallbackQRCode(certificateNumber);
   }
 
-  // Fallback QR code generation with certificate data
+// Fallback QR code generation with certificate data
   static Future<pw.ImageProvider> _generateFallbackQRCode(
       String certificateNumber) async {
     final recorder = ui.PictureRecorder();
@@ -821,7 +643,8 @@ class CertificateGenerator {
       ..color = Colors.black
       ..style = ui.PaintingStyle.fill;
 
-    final verificationData = 'https://luyip.edu/verify?cert=$certificateNumber';
+    final verificationData =
+        'https://education-all-in-one.web.app/#/verify?cert=$certificateNumber';
     final hash = verificationData.hashCode;
 
     // Create a pattern based on verification data
@@ -864,6 +687,188 @@ class CertificateGenerator {
     }
 
     return pw.MemoryImage(imgBytes.buffer.asUint8List());
+  }
+
+// Also update the verification text in your certificate to reflect the correct URL
+  static pw.Widget _buildCredentialsSection(
+    DateTime issueDate,
+    String certificateNumber,
+    String issuerName,
+    pw.ImageProvider signatureImage,
+    pw.ImageProvider sealImage,
+    pw.ImageProvider qrCodeImage,
+    pw.Font bodyFont,
+    pw.Font semiBoldFont,
+    pw.Font lightFont,
+  ) {
+    return pw.Container(
+      height: 100, // Fixed height for bottom section
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        children: [
+          // Date and certificate info
+          pw.Expanded(
+            flex: 3,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(6),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(
+                      color: PdfColor.fromHex('#e0e0e0'),
+                      width: 1,
+                    ),
+                    borderRadius: pw.BorderRadius.circular(4),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'Issue Date:',
+                        style: pw.TextStyle(
+                          font: lightFont,
+                          fontSize: 7,
+                          color: PdfColor.fromHex('#666666'),
+                        ),
+                      ),
+                      pw.SizedBox(height: 1),
+                      pw.Text(
+                        DateFormat('MMMM dd, yyyy').format(issueDate),
+                        style: pw.TextStyle(
+                          font: semiBoldFont,
+                          fontSize: 9,
+                          color: PdfColor.fromHex('#333333'),
+                        ),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Certificate ID:',
+                        style: pw.TextStyle(
+                          font: lightFont,
+                          fontSize: 7,
+                          color: PdfColor.fromHex('#666666'),
+                        ),
+                      ),
+                      pw.SizedBox(height: 1),
+                      pw.Text(
+                        certificateNumber.isNotEmpty
+                            ? certificateNumber
+                            : 'CERT-ID-NOT-SET',
+                        style: pw.TextStyle(
+                          font: bodyFont,
+                          fontSize: 7,
+                          color: PdfColor.fromHex('#1565c0'),
+                        ),
+                        maxLines: 2,
+                        overflow: pw.TextOverflow.clip,
+                      ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  'Verify at: education-all-in-one.web.app/verify', // Updated URL
+                  style: pw.TextStyle(
+                    font: bodyFont,
+                    fontSize: 7,
+                    color: PdfColor.fromHex('#1565c0'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          pw.SizedBox(width: 10),
+
+          // Signature section
+          pw.Expanded(
+            flex: 3,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Container(
+                  height: 35,
+                  width: 100,
+                  child: pw.Image(signatureImage, fit: pw.BoxFit.contain),
+                ),
+                pw.SizedBox(height: 2),
+                pw.Container(
+                  width: 100,
+                  height: 1,
+                  color: PdfColor.fromHex('#cccccc'),
+                ),
+                pw.SizedBox(height: 3),
+                pw.Text(
+                  issuerName.isNotEmpty ? issuerName : 'Authorized Signatory',
+                  style: pw.TextStyle(
+                    font: semiBoldFont,
+                    fontSize: 8,
+                    color: PdfColor.fromHex('#333333'),
+                  ),
+                  textAlign: pw.TextAlign.center,
+                ),
+                pw.Text(
+                  'Authorized Signatory',
+                  style: pw.TextStyle(
+                    font: lightFont,
+                    fontSize: 7,
+                    color: PdfColor.fromHex('#666666'),
+                  ),
+                ),
+                pw.Text(
+                  'LUYIP Educational Institute',
+                  style: pw.TextStyle(
+                    font: bodyFont,
+                    fontSize: 6,
+                    color: PdfColor.fromHex('#666666'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          pw.SizedBox(width: 10),
+
+          // Seal and QR code
+          pw.Expanded(
+            flex: 2,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.center,
+                  children: [
+                    pw.Container(
+                      height: 45,
+                      width: 45,
+                      child: pw.Image(sealImage, fit: pw.BoxFit.contain),
+                    ),
+                    pw.SizedBox(width: 8),
+                    pw.Container(
+                      height: 40,
+                      width: 40,
+                      child: pw.Image(qrCodeImage, fit: pw.BoxFit.contain),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  'Scan to Verify Certificate',
+                  style: pw.TextStyle(
+                    font: lightFont,
+                    fontSize: 6,
+                    color: PdfColor.fromHex('#666666'),
+                  ),
+                  textAlign: pw.TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // Upload certificate to Firebase Storage and return URL

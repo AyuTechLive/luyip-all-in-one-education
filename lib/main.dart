@@ -18,6 +18,11 @@ import 'package:luyip_website_edu/home/admin_dashboard.dart';
 import 'package:luyip_website_edu/home/student_dashboard.dart';
 import 'package:luyip_website_edu/student_dashboard/student_dashboard.dart';
 import 'package:luyip_website_edu/teacher/teacherdashboard.dart';
+import 'package:luyip_website_edu/verification_certificate/certificate_routing.dart';
+import 'package:luyip_website_edu/verification_certificate/certificate_verification_page.dart';
+import 'package:luyip_website_edu/website/general_pages/about_us.dart';
+import 'package:luyip_website_edu/website/general_pages/contact_us.dart';
+import 'package:luyip_website_edu/website/general_pages/privacy_policy.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -41,41 +46,82 @@ class EducationApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
         fontFamily: 'Poppins',
-        textTheme: const TextTheme(
-          displayLarge: TextStyle(fontWeight: FontWeight.bold),
-          displayMedium: TextStyle(fontWeight: FontWeight.bold),
-          displaySmall: TextStyle(fontWeight: FontWeight.bold),
-          headlineMedium: TextStyle(fontWeight: FontWeight.bold),
-          titleLarge: TextStyle(fontWeight: FontWeight.w600),
-          bodyLarge: TextStyle(fontSize: 16.0),
-          bodyMedium: TextStyle(fontSize: 14.0),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            elevation: 2,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ),
-        cardTheme: CardTheme(
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+        // ... your existing theme
       ),
-      // Add named routes for URL routing
+      // Add these routes for certificate verification
       routes: {
         '/': (context) => const AuthWrapper(),
         '/admin': (context) => const AdminRouteHandler(),
         '/teacher': (context) => const TeacherRouteHandler(),
         '/franchise': (context) => const FranchiseRouteHandler(),
         '/student': (context) => const StudentRouteHandler(),
+        '/verify': (context) =>
+            const CertificateVerificationRoute(), // Add this
+        '/about-us': (context) => const AboutUsPage(),
+        // '/contact-us': (context) => const ContactUsPage(),
+        '/privacy-policy': (context) => const PrivacyPolicyPage(),
+        '/terms-conditions': (context) => const TermsConditionsPage(),
+        // '/refund-policy': (context) => const RefundPolicyPage(),
       },
       initialRoute: '/',
-      // Handle unknown routes
+      // Enhanced route generation to handle QR parameters
+      onGenerateRoute: (settings) {
+        final uri = Uri.parse(settings.name ?? '/');
+
+        // Handle certificate verification routes
+        if (uri.path == '/verify') {
+          final certParam = uri.queryParameters['cert'];
+          return MaterialPageRoute(
+            builder: (context) => CertificateVerificationRoute(
+              certificateNumber: certParam,
+            ),
+          );
+        }
+
+        // Handle other routes
+        switch (uri.path) {
+          case '/about-us':
+            return MaterialPageRoute(
+              builder: (context) => const AboutUsPage(),
+            );
+          // case '/contact-us':
+          //   return MaterialPageRoute(
+          //     builder: (context) => const ContactUsPage(),
+          //   );
+          case '/privacy-policy':
+            return MaterialPageRoute(
+              builder: (context) => const PrivacyPolicyPage(),
+            );
+          case '/terms-conditions':
+            return MaterialPageRoute(
+              builder: (context) => const TermsConditionsPage(),
+            );
+          // case '/refund-policy':
+          //   return MaterialPageRoute(
+          //     builder: (context) => const RefundPolicyPage(),
+          //   );
+          case '/admin':
+            return MaterialPageRoute(
+              builder: (context) => const AdminRouteHandler(),
+            );
+          case '/teacher':
+            return MaterialPageRoute(
+              builder: (context) => const TeacherRouteHandler(),
+            );
+          case '/franchise':
+            return MaterialPageRoute(
+              builder: (context) => const FranchiseRouteHandler(),
+            );
+          case '/student':
+            return MaterialPageRoute(
+              builder: (context) => const StudentRouteHandler(),
+            );
+          default:
+            return MaterialPageRoute(
+              builder: (context) => const AuthWrapper(),
+            );
+        }
+      },
       onUnknownRoute: (settings) {
         return MaterialPageRoute(
           builder: (context) => const AuthWrapper(),
@@ -1056,6 +1102,14 @@ class _HomePageState extends State<HomePage> {
         'copyrightText': 'Luiyp Education. All rights reserved.',
         'loadingText': 'Loading your educational journey...',
         'contactNumber': '+911234567890',
+        // Social Media Links
+        'socialMediaLinks': {
+          'facebook': '',
+          'youtube': '',
+          'telegram': '',
+          'instagram': '',
+          'linkedin': '',
+        },
       };
     });
   }
@@ -1305,18 +1359,10 @@ class _NavBarState extends State<NavBar> {
                   Navigator.pushNamed(context, '/franchise');
                 }),
                 _buildNavigationItem('Verify Certificate', () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const ComingSoonScreen(
-                            pageName: 'Certificate Verification')),
-                  );
+                  Navigator.pushNamed(context, '/verify');
                 }),
                 _buildNavigationItem('About Us', () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('About Us section coming soon!')),
-                  );
+                  Navigator.pushNamed(context, '/about-us');
                 }),
                 _buildNavigationItem('Contact', () {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -1400,12 +1446,12 @@ class _NavBarState extends State<NavBar> {
                       ),
                     );
                   }),
-                  _buildMobileMenuItem('Admin', Icons.admin_panel_settings, () {
-                    setState(() {
-                      _showMenu = false;
-                    });
-                    Navigator.pushNamed(context, '/admin');
-                  }),
+                  // _buildMobileMenuItem('Admin', Icons.admin_panel_settings, () {
+                  //   setState(() {
+                  //     _showMenu = false;
+                  //   });
+                  //   Navigator.pushNamed(context, '/admin');
+                  // }),
                   _buildMobileMenuItem('Teacher', Icons.person_outline, () {
                     setState(() {
                       _showMenu = false;
@@ -1423,23 +1469,10 @@ class _NavBarState extends State<NavBar> {
                     setState(() {
                       _showMenu = false;
                     });
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ComingSoonScreen(
-                          pageName: 'Certificate Verification',
-                        ),
-                      ),
-                    );
+                    Navigator.pushNamed(context, '/verify');
                   }),
                   _buildMobileMenuItem('About Us', Icons.info, () {
-                    setState(() {
-                      _showMenu = false;
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('About Us section coming soon!')),
-                    );
+                    Navigator.pushNamed(context, '/about-us');
                   }),
                   _buildMobileMenuItem('Contact', Icons.contact_phone, () {
                     setState(() {
@@ -3695,11 +3728,40 @@ class Footer extends StatelessWidget {
     return websiteContent[key]?.toString() ?? defaultValue;
   }
 
+  Map<String, String> _getSocialMediaLinks() {
+    final socialLinks = websiteContent['socialMediaLinks'];
+    if (socialLinks is Map) {
+      return Map<String, String>.from(socialLinks);
+    }
+    return {
+      'facebook': '',
+      'youtube': '',
+      'telegram': '',
+      'instagram': '',
+      'linkedin': '',
+    };
+  }
+
   void _navigateToPage(BuildContext context, String pageName) {
     Widget? targetPage;
     String? routeName;
 
     switch (pageName) {
+      case 'About Us':
+        routeName = '/about-us';
+        break;
+      case 'Contact Us':
+        routeName = '/contact-us';
+        break;
+      case 'Privacy Policy':
+        routeName = '/privacy-policy';
+        break;
+      case 'Terms & Conditions':
+        routeName = '/terms-conditions';
+        break;
+      case 'Refund Policy':
+        routeName = '/refund-policy';
+        break;
       case 'Admin':
         routeName = '/admin';
         break;
@@ -3711,6 +3773,9 @@ class Footer extends StatelessWidget {
         break;
       case 'Student Login':
         routeName = '/student';
+        break;
+      case 'Verify Certificate':
+        routeName = '/verify';
         break;
       case 'About Us':
         targetPage = const ComingSoonScreen(pageName: 'About Us');
@@ -3781,10 +3846,34 @@ class Footer extends StatelessWidget {
     }
   }
 
+  void _launchSocialMedia(
+      BuildContext context, String platform, String url) async {
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$platform link not configured')),
+      );
+      return;
+    }
+
+    try {
+      final Uri uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'Could not launch $url';
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open $platform link')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final Size screenSize = MediaQuery.of(context).size;
     final bool isMobile = screenSize.width < 800;
+    final socialLinks = _getSocialMediaLinks();
 
     return Container(
       width: double.infinity,
@@ -3816,12 +3905,12 @@ class Footer extends StatelessWidget {
                   ),
                 ),
               ),
-              if (!isMobile) _buildSocialMediaIcons(),
+              if (!isMobile) _buildSocialMediaIcons(context, socialLinks),
             ],
           ),
 
           if (isMobile) const SizedBox(height: 20),
-          if (isMobile) _buildSocialMediaIcons(),
+          if (isMobile) _buildSocialMediaIcons(context, socialLinks),
         ],
       ),
     );
@@ -3935,23 +4024,21 @@ class Footer extends StatelessWidget {
               _buildFooterLink(context, 'Test Series'),
               _buildFooterLink(context, 'Success Stories'),
               _buildFooterLink(context, 'Blog'),
-              _buildFooterLink(context, 'Admin'),
-              _buildFooterLink(context, 'Teacher'),
-              _buildFooterLink(context, 'Franchise'),
+              _buildFooterLink(context, 'Verify Certificate'),
             ],
           ),
         ),
 
         const SizedBox(width: 40),
 
-        // Resources
+        // Access & Resources
         Expanded(
           flex: 2,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Resources',
+                'Access & Resources',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -3959,6 +4046,9 @@ class Footer extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              _buildFooterLink(context, 'Teacher'),
+              _buildFooterLink(context, 'Franchise'),
+              // _buildFooterLink(context, 'Admin'),
               _buildFooterLink(context, 'NCERT Solutions'),
               _buildFooterLink(context, 'Sample Papers'),
               _buildFooterLink(context, 'Previous Year Papers'),
@@ -4086,12 +4176,13 @@ class Footer extends StatelessWidget {
           'Test Series',
           'Success Stories',
           'Blog',
-          'Admin',
-          'Teacher',
-          'Franchise',
+          'Verify Certificate',
         ]),
 
-        _buildMobileExpandableSection(context, 'Resources', [
+        _buildMobileExpandableSection(context, 'Access & Resources', [
+          // 'Admin',
+          'Teacher',
+          'Franchise',
           'NCERT Solutions',
           'Sample Papers',
           'Previous Year Papers',
@@ -4154,34 +4245,74 @@ class Footer extends StatelessWidget {
     );
   }
 
-  Widget _buildSocialMediaIcons() {
+  Widget _buildSocialMediaIcons(
+      BuildContext context, Map<String, String> socialLinks) {
+    final List<Map<String, dynamic>> socialMediaData = [
+      {
+        'icon': Icons.facebook,
+        'color': const Color(0xFF1877F2),
+        'platform': 'facebook',
+        'url': socialLinks['facebook'] ?? '',
+      },
+      {
+        'icon': Icons.smart_display, // YouTube icon alternative
+        'color': const Color(0xFFFF0000),
+        'platform': 'youtube',
+        'url': socialLinks['youtube'] ?? '',
+      },
+      {
+        'icon': Icons.telegram,
+        'color': const Color(0xFF0088CC),
+        'platform': 'telegram',
+        'url': socialLinks['telegram'] ?? '',
+      },
+      {
+        'icon': Icons.camera_alt, // Instagram icon alternative
+        'color': const Color(0xFFE4405F),
+        'platform': 'instagram',
+        'url': socialLinks['instagram'] ?? '',
+      },
+      {
+        'icon': Icons.business, // LinkedIn icon alternative
+        'color': const Color(0xFF0077B5),
+        'platform': 'linkedin',
+        'url': socialLinks['linkedin'] ?? '',
+      },
+    ];
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _buildSocialIcon(Icons.facebook, Colors.blue),
-        _buildSocialIcon(Icons.youtube_searched_for, Colors.red),
-        _buildSocialIcon(Icons.telegram, Colors.blue.shade300),
-        _buildSocialIcon(Icons.camera_alt, Colors.pink),
-        _buildSocialIcon(Icons.link, Colors.grey),
-      ],
+      children: socialMediaData
+          .map((social) => _buildSocialIcon(
+                context,
+                social['icon'] as IconData,
+                social['color'] as Color,
+                social['platform'] as String,
+                social['url'] as String,
+              ))
+          .toList(),
     );
   }
 
-  Widget _buildSocialIcon(IconData icon, Color color) {
+  Widget _buildSocialIcon(BuildContext context, IconData icon, Color color,
+      String platform, String url) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade800,
-          shape: BoxShape.circle,
-        ),
-        child: Center(
-          child: Icon(
-            icon,
-            color: color,
-            size: 20,
+      child: GestureDetector(
+        onTap: () => _launchSocialMedia(context, platform, url),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade800,
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Icon(
+              icon,
+              color: color,
+              size: 20,
+            ),
           ),
         ),
       ),

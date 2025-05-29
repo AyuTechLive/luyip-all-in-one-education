@@ -116,7 +116,7 @@ class _StudentSidebarState extends State<StudentSidebar> {
               child: Column(
                 children: [
                   const SizedBox(height: 20),
-                  // Logo header with toggle button
+                  // Logo header with dynamic logo from Firebase
                   Container(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -138,38 +138,118 @@ class _StudentSidebarState extends State<StudentSidebar> {
                         ),
                       ],
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (widget.isExpanded)
-                          const Text(
-                            "LUIYP",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 22,
-                              letterSpacing: 1.5,
-                            ),
-                          )
-                        else
-                          const Text(
-                            "L",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 22,
-                            ),
-                          ),
-                        // Only show toggle button on desktop collapsed view
-                        if (!widget.isMobile && !widget.isExpanded)
-                          IconButton(
-                            icon: const Icon(
-                              Icons.chevron_right,
-                              color: Colors.white,
-                            ),
-                            onPressed: widget.onToggle,
-                          ),
-                      ],
+                    child: FutureBuilder<DocumentSnapshot>(
+                      future: FirebaseFirestore.instance
+                          .collection('website_general')
+                          .doc('dashboard')
+                          .get(),
+                      builder: (context, snapshot) {
+                        String logoUrl = '';
+                        String companyName = 'LUIYP';
+
+                        if (snapshot.hasData && snapshot.data!.exists) {
+                          final data =
+                              snapshot.data!.data() as Map<String, dynamic>?;
+                          final websiteContent = data?['websiteContent']
+                                  as Map<String, dynamic>? ??
+                              {};
+                          logoUrl = websiteContent['logoUrl']?.toString() ?? '';
+                          companyName = websiteContent['companyName']
+                                  ?.toString() ??
+                              websiteContent['companyShortName']?.toString() ??
+                              'LUIYP';
+                        }
+
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (widget.isExpanded && logoUrl.isNotEmpty)
+                              Image.network(
+                                logoUrl,
+                                width: 40,
+                                height: 40,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const SizedBox.shrink();
+                                },
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return const SizedBox(
+                                    width: 40,
+                                    height: 40,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  );
+                                },
+                              ),
+                            if (widget.isExpanded && logoUrl.isNotEmpty)
+                              const SizedBox(width: 12),
+                            if (widget.isExpanded)
+                              Flexible(
+                                child: Text(
+                                  companyName,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                    letterSpacing: 1.2,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              )
+                            else
+                              logoUrl.isNotEmpty
+                                  ? Image.network(
+                                      logoUrl,
+                                      width: 30,
+                                      height: 30,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        return const Text(
+                                          "L",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 22,
+                                          ),
+                                        );
+                                      },
+                                      loadingBuilder:
+                                          (context, child, loadingProgress) {
+                                        if (loadingProgress == null)
+                                          return child;
+                                        return const SizedBox(
+                                          width: 30,
+                                          height: 30,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        );
+                                      },
+                                    )
+                                  : const Text(
+                                      "L",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 22,
+                                      ),
+                                    ),
+                            // Only show toggle button on desktop collapsed view
+                            if (!widget.isMobile && !widget.isExpanded)
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.chevron_right,
+                                  color: Colors.white,
+                                ),
+                                onPressed: widget.onToggle,
+                              ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -349,25 +429,6 @@ class _StudentSidebarState extends State<StudentSidebar> {
                               ),
                             ),
 
-                          // _buildSidebarItem(
-                          //   context,
-                          //   Icons.calendar_today_outlined,
-                          //   'Schedule',
-                          //   isActive: widget.selectedPage == 'Schedule',
-                          // ),
-                          // _buildSidebarItem(
-                          //   context,
-                          //   Icons.assignment_outlined,
-                          //   'Assignments',
-                          //   isActive: widget.selectedPage == 'Assignments',
-                          //   badge: '4',
-                          // ),
-                          // _buildSidebarItem(
-                          //   context,
-                          //   Icons.library_books_outlined,
-                          //   'Library',
-                          //   isActive: widget.selectedPage == 'Library',
-                          // ),
                           _buildSidebarItem(
                             context,
                             Icons.workspace_premium_outlined,
@@ -510,8 +571,6 @@ class _StudentSidebarState extends State<StudentSidebar> {
       ),
     );
   }
-
-  // In StudentSidebar class, replace the _buildSidebarItem method with this fixed version:
 
   Widget _buildSidebarItem(
     BuildContext context,
