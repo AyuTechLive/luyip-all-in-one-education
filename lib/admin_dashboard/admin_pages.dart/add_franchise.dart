@@ -16,6 +16,7 @@ class AddFranchisePage extends StatefulWidget {
 class _AddFranchisePageState extends State<AddFranchisePage> {
   final _formKey = GlobalKey<FormState>();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Controllers for form fields
   final TextEditingController _nameController = TextEditingController();
@@ -39,6 +40,10 @@ class _AddFranchisePageState extends State<AddFranchisePage> {
   String _selectedStatus = 'Active';
   String _selectedCategory = 'Standard';
 
+  // Store current admin credentials
+  String? adminEmail;
+  String? adminPassword;
+
   final List<String> _statusOptions = ['Active', 'Inactive', 'Pending'];
   final List<String> _categoryOptions = [
     'Standard',
@@ -46,6 +51,20 @@ class _AddFranchisePageState extends State<AddFranchisePage> {
     'Gold',
     'Platinum'
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeAdminData();
+  }
+
+  void _initializeAdminData() {
+    User? currentUser = _auth.currentUser;
+    if (currentUser != null && currentUser.email != null) {
+      adminEmail = currentUser.email!;
+      print('Admin email stored: $adminEmail');
+    }
+  }
 
   @override
   void dispose() {
@@ -64,6 +83,262 @@ class _AddFranchisePageState extends State<AddFranchisePage> {
     super.dispose();
   }
 
+  Future<String> _promptForAdminPassword() async {
+    String? password;
+    bool keepTrying = true;
+    int attemptCount = 0;
+    const maxAttempts = 3;
+
+    while (keepTrying && attemptCount < maxAttempts) {
+      attemptCount++;
+      String errorMessage = '';
+
+      // Show error message if this is a retry
+      if (attemptCount > 1) {
+        if (attemptCount == maxAttempts) {
+          errorMessage =
+              'Last attempt! Incorrect password. Please try again carefully.';
+        } else {
+          errorMessage =
+              'Incorrect password. Please try again. (${maxAttempts - attemptCount + 1} attempts remaining)';
+        }
+      }
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          TextEditingController passwordController = TextEditingController();
+          bool isPasswordVisible = false;
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: ColorManager.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.security,
+                        color: ColorManager.primary,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      attemptCount > 1 ? 'Try Again' : 'Re-authenticate',
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Show error message if this is a retry
+                    if (errorMessage.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border:
+                              Border.all(color: Colors.red.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline,
+                                color: Colors.red, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                errorMessage,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    Text(
+                      'Please enter your password to continue creating the franchise account:',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: ColorManager.textMedium,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: passwordController,
+                        obscureText: !isPasswordVisible,
+                        autofocus: true, // Auto focus for better UX
+                        decoration: InputDecoration(
+                          labelText: 'Admin Password',
+                          hintText: 'Enter your password',
+                          prefixIcon: Icon(
+                            Icons.lock_outline,
+                            color: ColorManager.primary,
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              isPasswordVisible
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              color: ColorManager.primary,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                isPasswordVisible = !isPasswordVisible;
+                              });
+                            },
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                                color: ColorManager.primary, width: 2),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey.shade50,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 16,
+                          ),
+                        ),
+                        onSubmitted: (value) {
+                          // Allow pressing Enter to submit
+                          password = value;
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  if (attemptCount >=
+                      maxAttempts) // Show cancel only on last attempt
+                    TextButton(
+                      onPressed: () {
+                        password = null; // Set to null to indicate cancellation
+                        keepTrying = false;
+                        Navigator.of(context).pop();
+                      },
+                      child: Text(
+                        'Cancel Registration',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  TextButton(
+                    onPressed: () {
+                      password = ''; // Empty password to continue loop
+                      Navigator.of(context).pop();
+                    },
+                    child: Text(
+                      'Skip for Now',
+                      style: TextStyle(color: ColorManager.textMedium),
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      password = passwordController.text;
+                      Navigator.of(context).pop();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ColorManager.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(attemptCount > 1 ? 'Try Again' : 'Continue'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+
+      // Check what user chose
+      if (password == null) {
+        // User cancelled completely
+        keepTrying = false;
+        return '';
+      } else if (password!.isEmpty) {
+        // User chose to skip - treat as cancellation
+        keepTrying = false;
+        return '';
+      } else {
+        // User entered a password, try to authenticate
+        try {
+          // Test the password by attempting to sign in
+          User? adminUser = _auth.currentUser;
+          if (adminUser?.email != null) {
+            // Create a temporary auth instance to test password
+            await _auth.signInWithEmailAndPassword(
+              email: adminUser!.email!,
+              password: password!,
+            );
+            // If we reach here, password is correct
+            keepTrying = false;
+            return password!;
+          } else {
+            throw Exception('Admin user not found');
+          }
+        } catch (e) {
+          // Password is wrong, continue the loop
+          if (attemptCount >= maxAttempts) {
+            // Max attempts reached
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                      'Maximum password attempts reached. Registration cancelled.'),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            }
+            keepTrying = false;
+            return '';
+          }
+          // Continue loop for retry
+        }
+      }
+    }
+
+    return '';
+  }
+
   Future<void> _addFranchise() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -74,11 +349,32 @@ class _AddFranchisePageState extends State<AddFranchisePage> {
     });
 
     try {
+      // Store current admin user
+      User? adminUser = _auth.currentUser;
+      if (adminUser == null) {
+        throw Exception('Admin user not logged in');
+      }
+
       // Create Firebase Auth account for the franchise
       UserCredential userCredential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          await _auth.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
+      );
+
+      // Sign out the newly created franchise user
+      await _auth.signOut();
+
+      // Prompt for admin password and re-authenticate with retry logic
+      String adminPassword = await _promptForAdminPassword();
+      if (adminPassword.isEmpty) {
+        throw Exception('Admin authentication cancelled');
+      }
+
+      // Re-authenticate admin user
+      await _auth.signInWithEmailAndPassword(
+        email: adminUser.email!,
+        password: adminPassword,
       );
 
       // Format current date
@@ -109,6 +405,8 @@ class _AddFranchisePageState extends State<AddFranchisePage> {
         'ActiveCourses': [],
         'My Courses': [], // Add this for consistency with other user types
         'CreatedAt': FieldValue.serverTimestamp(),
+        'AddedBy': 'admin',
+        'AddedDate': formattedDate,
       };
 
       // Add to Firestore in franchise collection (same structure as signup)
@@ -126,6 +424,28 @@ class _AddFranchisePageState extends State<AddFranchisePage> {
           .set(franchiseData);
 
       Utils().toastMessage('Franchise account created successfully!');
+
+      // Show success dialog with details
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('✅ Franchise Account Created'),
+                Text('📧 Email: ${_emailController.text.trim()}'),
+                Text('🏢 Franchise: ${_franchiseNameController.text.trim()}'),
+                Text('💰 Commission: ${_commissionController.text.trim()}%'),
+                Text(
+                    '📍 Location: ${_cityController.text.trim()}, ${_stateController.text.trim()}'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
 
       // Call callback if provided
       if (widget.onFranchiseAdded != null) {
@@ -154,11 +474,29 @@ class _AddFranchisePageState extends State<AddFranchisePage> {
         errorMessage += 'Password is too weak.';
       } else if (error.toString().contains('invalid-email')) {
         errorMessage += 'Invalid email address.';
+      } else if (error.toString().contains('wrong-password')) {
+        errorMessage += 'Incorrect admin password provided.';
+      } else if (error.toString().contains('user-not-found')) {
+        errorMessage += 'Admin account not found.';
+      } else if (error.toString().contains('too-many-requests')) {
+        errorMessage += 'Too many failed attempts. Please try again later.';
+      } else if (error.toString().contains('authentication cancelled')) {
+        errorMessage = 'Authentication cancelled by user.';
       } else {
         errorMessage += error.toString();
       }
 
       Utils().toastMessage(errorMessage);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 
@@ -264,7 +602,7 @@ class _AddFranchisePageState extends State<AddFranchisePage> {
 
               const SizedBox(height: 16),
 
-              // Info card about login
+              // Info card about login and authentication
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -272,19 +610,41 @@ class _AddFranchisePageState extends State<AddFranchisePage> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: ColorManager.info.withOpacity(0.3)),
                 ),
-                child: Row(
+                child: Column(
                   children: [
-                    Icon(Icons.info_outline, color: ColorManager.info),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'This will create a franchise account with login credentials. The franchise partner can use the provided email and password to log into the system.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: ColorManager.info,
-                          fontWeight: FontWeight.w500,
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline, color: ColorManager.info),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'This will create a franchise account with login credentials. You will be asked to re-authenticate to maintain admin session security.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: ColorManager.info,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.security,
+                            color: ColorManager.info, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Your admin session will remain active after creating the franchise account.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: ColorManager.info,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -369,8 +729,6 @@ class _AddFranchisePageState extends State<AddFranchisePage> {
                       // Login Credentials Section
                       _buildSectionHeader(
                           'Login Credentials', Icons.security_outlined),
-                      const SizedBox(height: 16),
-
                       const SizedBox(height: 16),
 
                       Row(
@@ -561,20 +919,43 @@ class _AddFranchisePageState extends State<AddFranchisePage> {
                                 elevation: 2,
                               ),
                               child: _isLoading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2,
-                                      ),
+                                  ? Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        const Text(
+                                          'Creating Franchise...',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
                                     )
-                                  : const Text(
-                                      'Add Franchise',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                  : Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.add_business,
+                                            size: 20),
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          'Add Franchise',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                             ),
                           ),

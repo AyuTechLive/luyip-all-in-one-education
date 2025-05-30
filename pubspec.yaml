@@ -59,6 +59,7 @@ dependencies:
   ivlivs_pdf_viewer: ^0.1.0
   youtube_player_flutter: ^9.1.1
   qr_code_scanner: ^1.0.1
+  mailer: ^6.4.1
  
   
 
